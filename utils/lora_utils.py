@@ -13,13 +13,6 @@ import safetensors
 
 from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 from diffusers.loaders import AttnProcsLayers, LoraLoaderMixin
-from diffusers.models.attention_processor import (
-    AttnAddedKVProcessor,
-    SlicedAttnAddedKVProcessor,
-    AttnAddedKVProcessor2_0,
-    LoRAAttnAddedKVProcessor,
-    LoRAAttnProcessor,
-)
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
 
@@ -84,17 +77,8 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     vae.to(device)
     text_encoder.to(device)
 
-    # Initialize UNet LoRA without hidden_size/cross_attention_dim
-    unet_lora_attn_procs = {}
-    for name, attn_processor in unet.attn_processors.items():
-        # We'll no longer extract hidden_size and cross_attention_dim, only rank is needed
-        # Just pass rank to LoRAAttnProcessor or LoRAAttnAddedKVProcessor
-        if isinstance(attn_processor, (AttnAddedKVProcessor, SlicedAttnAddedKVProcessor, AttnAddedKVProcessor2_0)):
-            # LoRAAttnAddedKVProcessor now only needs rank
-            unet_lora_attn_procs[name] = LoRAAttnAddedKVProcessor(rank=lora_rank)
-        else:
-            unet_lora_attn_procs[name] = LoRAAttnProcessor(rank=lora_rank)
-
+    # Create LoRA layers using create_lora_layers for given rank
+    unet_lora_attn_procs = LoraLoaderMixin.create_lora_layers(unet, lora_rank=lora_rank)
     unet.set_attn_processor(unet_lora_attn_procs)
     unet_lora_layers = AttnProcsLayers(unet.attn_processors)
 

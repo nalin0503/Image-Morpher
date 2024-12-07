@@ -52,9 +52,8 @@ class LoadProcessor():
 
     def __call__(self, attn, hidden_states, *args, encoder_hidden_states=None, attention_mask=None, **kwargs):
         if encoder_hidden_states is None:
-            # Guard against out-of-range indexing
             max_idx = len(self.img0_dict[self.name])
-            if self.id < int(50 * self.lamd) and self.id < max_idx:
+            if self.id < int(50*self.lamd) and self.id < max_idx:
                 map0 = self.img0_dict[self.name][self.id]
                 map1 = self.img1_dict[self.name][self.id]
                 cross_map = self.beta * hidden_states + (1 - self.beta)*((1 - self.alpha)*map0 + self.alpha*map1)
@@ -73,10 +72,11 @@ class LoadProcessor():
             if self.id >= max_idx:
                 self.id = 0
         else:
-            res = self.original_processor(attn, hidden_states, *args,
-                                          encoder_hidden_states=encoder_hidden_states,
-                                          attention_mask=attention_mask,
-                                          **kwargs)
+            res = self.original_processor(
+                attn, hidden_states, *args,
+                encoder_hidden_states=encoder_hidden_states,
+                attention_mask=attention_mask,
+                **kwargs)
         return res
 
 
@@ -91,7 +91,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                  safety_checker: StableDiffusionSafetyChecker,
                  feature_extractor: CLIPImageProcessor,
                  image_encoder=None,
-                 requires_safety_checker: bool = True):
+                 requires_safety_checker: bool=True):
         sig = inspect.signature(super().__init__)
         params = sig.parameters
         if 'image_encoder' in params:
@@ -112,7 +112,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         DEVICE = self.device
         if isinstance(image, Image.Image):
             image = np.array(image)
-            image = torch.from_numpy(image).float()/127.5 - 1
+            image = torch.from_numpy(image).float()/127.5-1
             image = image.permute(2,0,1).unsqueeze(0)
         latents = self.vae.encode(image.to(DEVICE))['latent_dist'].mean
         latents = latents*0.18215
@@ -120,7 +120,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
 
     @torch.no_grad()
     def latent2image(self, latents, return_type='np'):
-        latents = 1/0.18215 * latents.detach()
+        latents = 1/0.18215*latents.detach()
         image = self.vae.decode(latents)['sample']
         if return_type=='np':
             image = (image/2+0.5).clamp(0,1)
@@ -132,7 +132,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
     def ddim_inversion(self, latent, cond):
         timesteps = reversed(self.scheduler.timesteps)
         with torch.autocast(device_type='cuda',dtype=torch.float32):
-            for i,t in enumerate(tqdm.tqdm(timesteps, desc="DDIM inversion")):
+            for i,t in enumerate(tqdm.tqdm(timesteps,desc="DDIM inversion")):
                 cond_batch = cond.repeat(latent.shape[0],1,1)
                 alpha_prod_t = self.scheduler.alphas_cumprod[t]
                 alpha_prod_t_prev = (self.scheduler.alphas_cumprod[timesteps[i-1]] if i>0 else self.scheduler.final_alpha_cumprod)
@@ -141,7 +141,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 sigma = (1 - alpha_prod_t)**0.5
                 sigma_prev = (1 - alpha_prod_t_prev)**0.5
 
-                eps = self.unet(latent, t, encoder_hidden_states=cond_batch).sample
+                eps = self.unet(latent,t,encoder_hidden_states=cond_batch).sample
                 pred_x0 = (latent - sigma_prev*eps)/mu_prev
                 latent = mu*pred_x0 + sigma*eps
         return latent
@@ -149,32 +149,32 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
     @torch.no_grad()
     def get_text_embeddings(self, prompt, guidance_scale, neg_prompt, batch_size):
         DEVICE = self.device
-        text_input = self.tokenizer(prompt,padding="max_length",max_length=77,return_tensors="pt")
+        text_input = self.tokenizer(prompt, padding="max_length", max_length=77,return_tensors="pt")
         text_embeddings = self.text_encoder(text_input.input_ids.to(DEVICE))[0]
 
         if guidance_scale>1.:
             uc_text = neg_prompt if neg_prompt else ""
-            unconditional_input = self.tokenizer([uc_text]*batch_size, padding="max_length",max_length=77,return_tensors="pt")
+            unconditional_input = self.tokenizer([uc_text]*batch_size,padding="max_length",max_length=77,return_tensors="pt")
             unconditional_embeddings = self.text_encoder(unconditional_input.input_ids.to(DEVICE))[0]
-            text_embeddings = torch.cat([unconditional_embeddings, text_embeddings],dim=0)
+            text_embeddings = torch.cat([unconditional_embeddings,text_embeddings],dim=0)
         return text_embeddings
 
     @torch.no_grad()
-    def cal_latent(self, num_inference_steps, guidance_scale, unconditioning,
-                   img_noise_0, img_noise_1, text_embeddings_0, text_embeddings_1,
-                   lora_0, lora_1, alpha, use_lora, fix_lora=None):
-        latents = slerp(img_noise_0, img_noise_1, alpha, self.use_adain)
+    def cal_latent(self,num_inference_steps,guidance_scale,unconditioning,
+                   img_noise_0,img_noise_1,text_embeddings_0,text_embeddings_1,
+                   lora_0,lora_1,alpha,use_lora,fix_lora=None):
+        latents = slerp(img_noise_0,img_noise_1,alpha,self.use_adain)
         text_embeddings = (1-alpha)*text_embeddings_0 + alpha*text_embeddings_1
 
         self.scheduler.set_timesteps(num_inference_steps)
         if use_lora and lora_0 is not None and lora_1 is not None:
             if fix_lora is not None:
-                self.unet = load_lora(self.unet, lora_0, lora_1, fix_lora)
+                self.unet = load_lora(self.unet,lora_0,lora_1,fix_lora)
             else:
-                self.unet = load_lora(self.unet, lora_0, lora_1, alpha)
+                self.unet = load_lora(self.unet,lora_0,lora_1,alpha)
 
         for i,t in enumerate(tqdm.tqdm(self.scheduler.timesteps, desc=f"Sampling, alpha={alpha}")):
-            if guidance_scale > 1.0:
+            if guidance_scale>1.0:
                 model_inputs = torch.cat([latents]*2)
             else:
                 model_inputs = latents
@@ -183,7 +183,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 _, text_embeddings = text_embeddings.chunk(2)
                 text_embeddings = torch.cat([unconditioning[i].expand(*text_embeddings.shape),text_embeddings])
 
-            noise_pred = self.unet(model_inputs, t, encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(model_inputs,t,encoder_hidden_states=text_embeddings).sample
             if guidance_scale>1.0:
                 noise_pred_uncon, noise_pred_con = noise_pred.chunk(2,dim=0)
                 noise_pred = noise_pred_uncon + guidance_scale*(noise_pred_con-noise_pred_uncon)
@@ -206,9 +206,9 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             for k in self.unet.attn_processors.keys():
                 if do_replace_attn(k):
                     if self.use_lora:
-                        attn_processor_dict[k] = StoreProcessor(self.unet.attn_processors[k], self.img0_dict, k)
+                        attn_processor_dict[k] = StoreProcessor(self.unet.attn_processors[k],self.img0_dict,k)
                     else:
-                        attn_processor_dict[k] = StoreProcessor(original_processor, self.img0_dict, k)
+                        attn_processor_dict[k] = StoreProcessor(original_processor,self.img0_dict,k)
                 else:
                     attn_processor_dict[k] = self.unet.attn_processors[k]
             self.unet.set_attn_processor(attn_processor_dict)
@@ -228,9 +228,9 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             for k in self.unet.attn_processors.keys():
                 if do_replace_attn(k):
                     if self.use_lora:
-                        attn_processor_dict[k] = StoreProcessor(self.unet.attn_processors[k], self.img1_dict, k)
+                        attn_processor_dict[k] = StoreProcessor(self.unet.attn_processors[k],self.img1_dict,k)
                     else:
-                        attn_processor_dict[k] = StoreProcessor(original_processor, self.img1_dict, k)
+                        attn_processor_dict[k] = StoreProcessor(original_processor,self.img1_dict,k)
                 else:
                     attn_processor_dict[k] = self.unet.attn_processors[k]
             self.unet.set_attn_processor(attn_processor_dict)
@@ -244,7 +244,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 last_image.save(f"{self.output_path}/{len(alpha_list)-1:02d}.png")
 
             # Intermediates
-            for i in progress.tqdm(range(1,len(alpha_list)-1), desc=desc):
+            for i in progress.tqdm(range(1,len(alpha_list)-1),desc=desc):
                 alpha = alpha_list[i]
                 if self.use_lora and lora_0 is not None and lora_1 is not None:
                     self.unet = load_lora(self.unet,lora_0,lora_1,alpha if fix_lora is None else fix_lora)
@@ -252,10 +252,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 attn_processor_dict = {}
                 for k in self.unet.attn_processors.keys():
                     if do_replace_attn(k):
-                        attn_processor_dict[k] = LoadProcessor(
-                            self.unet.attn_processors[k],
-                            k,self.img0_dict,self.img1_dict,alpha,attn_beta,lamd
-                        )
+                        attn_processor_dict[k] = LoadProcessor(self.unet.attn_processors[k],
+                                                               k,self.img0_dict,self.img1_dict,alpha,attn_beta,lamd)
                     else:
                         attn_processor_dict[k] = self.unet.attn_processors[k]
 
@@ -275,7 +273,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             # No attention blending
             for k,alpha in enumerate(alpha_list):
                 latents = self.cal_latent(num_inference_steps,guidance_scale,unconditioning,
-                                          img_noise_0,img_noise_1,text_embeddings_0,text_embeddings_1,
+                                          img_noise_0,img_noise_1,
+                                          text_embeddings_0,text_embeddings_1,
                                           lora_0,lora_1,alpha,self.use_lora,fix_lora)
                 image = self.latent2image(latents)
                 image = Image.fromarray(image)
@@ -323,7 +322,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.output_path = output_path
         os.makedirs(output_path,exist_ok=True)
 
-        # Switch to LCM Scheduler for fast generation
+        # Use LCM-LoRA for fast generation
         self.scheduler = LCMScheduler.from_config(self.scheduler.config)
         if lcm_lora_path is not None:
             print(f"Loading LCM-LoRA from {lcm_lora_path}...")
@@ -377,7 +376,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         img_noise_1 = self.ddim_inversion(self.image2latent(img_1), text_embeddings_1)
 
         alpha_list = list(torch.linspace(0,1,num_frames))
-        # Initial morph to get frames
+        # Initial morph
         images_pt = self._morph(alpha_list, progress, "Sampling...", lora_0, lora_1,
                                 text_embeddings_0, text_embeddings_1,
                                 img_noise_0, img_noise_1,
@@ -391,11 +390,10 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             alpha_list = alpha_scheduler.get_list()
             print(alpha_list)
 
-            # Reset dicts to avoid KeyError
+            # Reset dictionaries for attention maps to avoid KeyError
             self.img0_dict = {}
             self.img1_dict = {}
 
-            # Re-run morph with updated alpha_list
             images = self._morph(alpha_list, progress, "Reschedule...",
                                  lora_0, lora_1, text_embeddings_0, text_embeddings_1,
                                  img_noise_0, img_noise_1,
