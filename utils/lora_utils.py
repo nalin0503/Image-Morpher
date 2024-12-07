@@ -63,16 +63,16 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     set_seed(0)
 
     if tokenizer is None:
-        tokenizer = AutoTokenizer.from_pretrained(model_path, subfolder="tokenizer",revision=None,use_fast=False)
+        tokenizer = AutoTokenizer.from_pretrained(model_path, subfolder="tokenizer", revision=None, use_fast=False)
     if noise_scheduler is None:
         noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
     if text_encoder is None:
-        text_encoder_cls = import_model_class_from_model_name_or_path(model_path,revision=None)
+        text_encoder_cls = import_model_class_from_model_name_or_path(model_path, revision=None)
         text_encoder = text_encoder_cls.from_pretrained(model_path, subfolder="text_encoder", revision=None)
     if vae is None:
         vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae", revision=None)
     if unet is None:
-        unet = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet",revision=None)
+        unet = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet", revision=None)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -84,29 +84,16 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     vae.to(device)
     text_encoder.to(device)
 
+    # Initialize UNet LoRA without hidden_size/cross_attention_dim
     unet_lora_attn_procs = {}
     for name, attn_processor in unet.attn_processors.items():
-        cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
-        if name.startswith("mid_block"):
-            hidden_size = unet.config.block_out_channels[-1]
-        elif name.startswith("up_blocks"):
-            block_id = int(name[len("up_blocks.")])
-            hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
-        elif name.startswith("down_blocks"):
-            block_id = int(name[len("down_blocks.")])
-            hidden_size = unet.config.block_out_channels[block_id]
+        # We'll no longer extract hidden_size and cross_attention_dim, only rank is needed
+        # Just pass rank to LoRAAttnProcessor or LoRAAttnAddedKVProcessor
+        if isinstance(attn_processor, (AttnAddedKVProcessor, SlicedAttnAddedKVProcessor, AttnAddedKVProcessor2_0)):
+            # LoRAAttnAddedKVProcessor now only needs rank
+            unet_lora_attn_procs[name] = LoRAAttnAddedKVProcessor(rank=lora_rank)
         else:
-            raise NotImplementedError("Block type unknown")
-
-        if isinstance(attn_processor,(AttnAddedKVProcessor,SlicedAttnAddedKVProcessor,AttnAddedKVProcessor2_0)):
-            lora_attn_processor_class = LoRAAttnAddedKVProcessor
-            unet_lora_attn_procs[name] = lora_attn_processor_class(
-                hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=lora_rank
-            )
-        else:
-            unet_lora_attn_procs[name] = LoRAAttnProcessor(
-                hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=lora_rank
-            )
+            unet_lora_attn_procs[name] = LoRAAttnProcessor(rank=lora_rank)
 
     unet.set_attn_processor(unet_lora_attn_procs)
     unet_lora_layers = AttnProcsLayers(unet.attn_processors)
@@ -123,7 +110,7 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
         text_inputs = tokenize_prompt(tokenizer, prompt)
         text_embedding = encode_prompt(text_encoder, text_inputs.input_ids, text_inputs.attention_mask, False)
 
-    if isinstance(image,np.ndarray):
+    if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
 
     image_transforms = transforms.Compose([
