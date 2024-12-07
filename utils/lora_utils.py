@@ -78,7 +78,7 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     text_encoder.to(device)
 
     # Create LoRA layers using create_lora_layers for given rank
-    unet_lora_attn_procs = LoraLoaderMixin.create_lora_layers(unet, lora_rank=lora_rank)
+    unet_lora_attn_procs = LoraLoaderMixin.write_lora_layers(unet, lora_rank=lora_rank)
     unet.set_attn_processor(unet_lora_attn_procs)
     unet_lora_layers = AttnProcsLayers(unet.attn_processors)
 
