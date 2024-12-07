@@ -91,7 +91,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                  safety_checker: StableDiffusionSafetyChecker,
                  feature_extractor: CLIPImageProcessor,
                  image_encoder=None,
-                 requires_safety_checker: bool=True):
+                 requires_safety_checker=True):
         sig = inspect.signature(super().__init__)
         params = sig.parameters
         if 'image_encoder' in params:
@@ -322,7 +322,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.output_path = output_path
         os.makedirs(output_path,exist_ok=True)
 
-        # Use LCM-LoRA for fast generation
+        # LCM-LoRA for fast generation
         self.scheduler = LCMScheduler.from_config(self.scheduler.config)
         if lcm_lora_path is not None:
             print(f"Loading LCM-LoRA from {lcm_lora_path}...")
@@ -380,7 +380,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         images_pt = self._morph(alpha_list, progress, "Sampling...", lora_0, lora_1,
                                 text_embeddings_0, text_embeddings_1,
                                 img_noise_0, img_noise_1,
-                                num_inference_steps, guidance_scale, unconditioning,
+                                num_inference_steps, guidance_scale, None,
                                 attn_beta, lamd, save_intermediates, fix_lora)
 
         if self.use_reschedule:
@@ -390,14 +390,14 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             alpha_list = alpha_scheduler.get_list()
             print(alpha_list)
 
-            # Reset dictionaries for attention maps to avoid KeyError
+            # Reset dicts
             self.img0_dict = {}
             self.img1_dict = {}
 
             images = self._morph(alpha_list, progress, "Reschedule...",
                                  lora_0, lora_1, text_embeddings_0, text_embeddings_1,
                                  img_noise_0, img_noise_1,
-                                 num_inference_steps, guidance_scale, unconditioning,
+                                 num_inference_steps, guidance_scale, None,
                                  attn_beta, lamd, save_intermediates, fix_lora)
         else:
             images = images_pt
