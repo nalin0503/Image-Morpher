@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
-parser.add_argument("--model_path", type=str, default="stabilityai/stable-diffusion-2-1-base",
+parser.add_argument("--model_path", type=str, default="stabilityai/stable-diffusion-xl-base-1.0",
                     help="Pretrained model to use (default: %(default)s)")
 parser.add_argument("--image_path_0", type=str, default="",
                     help="Path of the first image (default: %(default)s)")
@@ -43,7 +43,7 @@ parser.add_argument("--num_inference_steps", type=int, default=4,
                     help="Number of inference steps (default: 4 for LCM-LoRA)")
 parser.add_argument("--guidance_scale", type=float, default=1.0,
                     help="Guidance scale (LCM-LoRA recommended ~1.0)")
-parser.add_argument("--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdv1-5",
+parser.add_argument("--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdxl",
                     help="Path or HF Hub ID for LCM-LoRA weights (default: %(default)s)")
 
 args = parser.parse_args()
