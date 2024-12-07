@@ -12,3 +12,6 @@ transformers==4.34.1
 torch
 torchvision
 lpips
+
+
+pip install torch torchvision transformers diffusers accelerate tensorflow tensorflow-hub pillow numpy moviepy peft click pyparsing distro pexpect einops lpips
