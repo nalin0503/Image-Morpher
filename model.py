@@ -89,8 +89,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                  safety_checker: StableDiffusionSafetyChecker,
                  feature_extractor: CLIPImageProcessor,
                  image_encoder=None,
-                 requires_safety_checker: bool = True,
-                 ):
+                 requires_safety_checker: bool = True):
         sig = inspect.signature(super().__init__)
         params = sig.parameters
         if 'image_encoder' in params:
@@ -129,11 +128,11 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
 
     @torch.no_grad()
     def ddim_inversion(self, latent, cond):
+        # LCM-LoRA doesn't typically require this step, but we keep it for compatibility.
         timesteps = reversed(self.scheduler.timesteps)
         with torch.autocast(device_type='cuda', dtype=torch.float32):
             for i, t in enumerate(tqdm.tqdm(timesteps, desc="DDIM inversion")):
                 cond_batch = cond.repeat(latent.shape[0], 1, 1)
-
                 alpha_prod_t = self.scheduler.alphas_cumprod[t]
                 alpha_prod_t_prev = (
                     self.scheduler.alphas_cumprod[timesteps[i - 1]]
@@ -170,7 +169,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         text_embeddings = (1 - alpha) * text_embeddings_0 + alpha * text_embeddings_1
 
         self.scheduler.set_timesteps(num_inference_steps)
-        if use_lora:
+        if use_lora and lora_0 is not None and lora_1 is not None:
+            # If we are mixing LoRAs, load them at interpolation values
             if fix_lora is not None:
                 self.unet = load_lora(self.unet, lora_0, lora_1, fix_lora)
             else:
@@ -201,8 +201,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
 
         images = []
         if attn_beta is not None:
-            # Store attention maps for first frame
-            if self.use_lora:
+            # This block handles storing/loading attention maps for blending
+            if self.use_lora and lora_0 is not None and lora_1 is not None:
                 self.unet = load_lora(self.unet, lora_0, lora_1, 0 if fix_lora is None else fix_lora)
 
             attn_processor_dict = {}
@@ -212,8 +212,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         attn_processor_dict[k] = StoreProcessor(self.unet.attn_processors[k],
                                                                 self.img0_dict, k)
                     else:
-                        attn_processor_dict[k] = StoreProcessor(original_processor,
-                                                                self.img0_dict, k)
+                        attn_processor_dict[k] = StoreProcessor(original_processor, self.img0_dict, k)
                 else:
                     attn_processor_dict[k] = self.unet.attn_processors[k]
             self.unet.set_attn_processor(attn_processor_dict)
@@ -236,8 +235,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             if save_intermediates:
                 first_image.save(f"{self.output_path}/{0:02d}.png")
 
-            # Store attention maps for last frame
-            if self.use_lora:
+            # Repeat for last frame
+            if self.use_lora and lora_0 is not None and lora_1 is not None:
                 self.unet = load_lora(self.unet, lora_0, lora_1, 1 if fix_lora is None else fix_lora)
             attn_processor_dict = {}
             for k in self.unet.attn_processors.keys():
@@ -246,8 +245,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         attn_processor_dict[k] = StoreProcessor(self.unet.attn_processors[k],
                                                                 self.img1_dict, k)
                     else:
-                        attn_processor_dict[k] = StoreProcessor(original_processor,
-                                                                self.img1_dict, k)
+                        attn_processor_dict[k] = StoreProcessor(original_processor, self.img1_dict, k)
                 else:
                     attn_processor_dict[k] = self.unet.attn_processors[k]
 
@@ -274,7 +272,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             # Intermediate frames
             for i in progress.tqdm(range(1, len(alpha_list) - 1), desc=desc):
                 alpha = alpha_list[i]
-                if self.use_lora:
+                if self.use_lora and lora_0 is not None and lora_1 is not None:
                     self.unet = load_lora(self.unet, lora_0, lora_1, alpha if fix_lora is None else fix_lora)
 
                 attn_processor_dict = {}
@@ -313,7 +311,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
 
             images = [first_image] + images + [last_image]
         else:
-            # No attention blending, just direct interpolation
+            # Direct interpolation without attention blending
             for k, alpha in enumerate(alpha_list):
                 latents = self.cal_latent(num_inference_steps,
                                           guidance_scale,
@@ -351,8 +349,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                  batch_size=1,
                  height=512,
                  width=512,
-                 num_inference_steps=4,    # fewer steps for LCM-LoRA
-                 guidance_scale=1.0,       # recommended for LCM-LoRA
+                 num_inference_steps=4,
+                 guidance_scale=1.0,
                  attn_beta=0,
                  lamd=0.6,
                  use_lora=True,
@@ -374,15 +372,13 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.output_path = output_path
         os.makedirs(output_path, exist_ok=True)
 
-        # Switch to LCMScheduler for LCM-LoRA acceleration
+        # Switch to LCMScheduler for LCM-LoRA
         self.scheduler = LCMScheduler.from_config(self.scheduler.config)
 
-        # If LCM-LoRA is provided, load it now
+        # Load LCM-LoRA if provided
         if lcm_lora_path is not None:
             print(f"Loading LCM-LoRA from {lcm_lora_path}...")
             self.load_lora_weights(lcm_lora_path)
-            # If fuse_lora is supported by your diffusers version, uncomment the next line:
-            # self.fuse_lora()
             print("LCM-LoRA loaded successfully.")
 
         if img_0 is None:
@@ -390,31 +386,39 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         if img_1 is None:
             img_1 = Image.open(img_path_1).convert("RGB")
 
-        if self.use_lora:
-            # Handle training or loading LoRAs for morphing as before
-            if not load_lora_path_0:
-                weight_name = f"{output_path.split('/')[-1]}_lora_0.ckpt"
-                load_lora_path_0 = os.path.join(save_lora_dir, weight_name)
-                if not os.path.exists(load_lora_path_0):
-                    train_lora(img_0, prompt_0, save_lora_dir, None, self.tokenizer, self.text_encoder,
-                               self.vae, self.unet, self.scheduler, lora_steps, lora_lr, lora_rank, weight_name=weight_name)
-            if load_lora_path_0.endswith(".safetensors"):
-                lora_0 = safetensors.torch.load_file(load_lora_path_0, device="cpu")
-            else:
-                lora_0 = torch.load(load_lora_path_0, map_location="cpu")
-
-            if not load_lora_path_1:
-                weight_name = f"{output_path.split('/')[-1]}_lora_1.ckpt"
-                load_lora_path_1 = os.path.join(save_lora_dir, weight_name)
-                if not os.path.exists(load_lora_path_1):
-                    train_lora(img_1, prompt_1, save_lora_dir, None, self.tokenizer, self.text_encoder,
-                               self.vae, self.unet, self.scheduler, lora_steps, lora_lr, lora_rank, weight_name=weight_name)
-            if load_lora_path_1.endswith(".safetensors"):
-                lora_1 = safetensors.torch.load_file(load_lora_path_1, device="cpu")
-            else:
-                lora_1 = torch.load(load_lora_path_1, map_location="cpu")
+        # If no LoRA paths provided and no training needed (since LCM-LoRA is loaded),
+        # skip LoRA training. Just rely on LCM-LoRA.
+        if self.use_lora and (load_lora_path_0 == "" or load_lora_path_1 == "") and lcm_lora_path is not None:
+            # No separate LoRA for interpolation, just LCM-LoRA
+            lora_0 = None
+            lora_1 = None
         else:
-            lora_0 = lora_1 = None
+            # If you really want to train or load LoRAs:
+            if self.use_lora:
+                if not load_lora_path_0:
+                    weight_name = f"{output_path.split('/')[-1]}_lora_0.ckpt"
+                    load_lora_path_0 = os.path.join(save_lora_dir, weight_name)
+                    if not os.path.exists(load_lora_path_0):
+                        # Train LoRA only if no LCM-LoRA provided or if you still want it
+                        train_lora(img_0, prompt_0, save_lora_dir, None, self.tokenizer, self.text_encoder,
+                                   self.vae, self.unet, self.scheduler, lora_steps, lora_lr, lora_rank, weight_name=weight_name)
+                if load_lora_path_0.endswith(".safetensors"):
+                    lora_0 = safetensors.torch.load_file(load_lora_path_0, device="cpu")
+                else:
+                    lora_0 = torch.load(load_lora_path_0, map_location="cpu")
+
+                if not load_lora_path_1:
+                    weight_name = f"{output_path.split('/')[-1]}_lora_1.ckpt"
+                    load_lora_path_1 = os.path.join(save_lora_dir, weight_name)
+                    if not os.path.exists(load_lora_path_1):
+                        train_lora(img_1, prompt_1, save_lora_dir, None, self.tokenizer, self.text_encoder,
+                                   self.vae, self.unet, self.scheduler, lora_steps, lora_lr, lora_rank, weight_name=weight_name)
+                if load_lora_path_1.endswith(".safetensors"):
+                    lora_1 = safetensors.torch.load_file(load_lora_path_1, device="cpu")
+                else:
+                    lora_1 = torch.load(load_lora_path_1, map_location="cpu")
+            else:
+                lora_0 = lora_1 = None
 
         text_embeddings_0 = self.get_text_embeddings(prompt_0, guidance_scale, neg_prompt, batch_size)
         text_embeddings_1 = self.get_text_embeddings(prompt_1, guidance_scale, neg_prompt, batch_size)
@@ -422,10 +426,10 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         img_0 = get_img(img_0)
         img_1 = get_img(img_1)
 
-        if self.use_lora:
+        if self.use_lora and lora_0 is not None and lora_1 is not None:
             self.unet = load_lora(self.unet, lora_0, lora_1, 0)
         img_noise_0 = self.ddim_inversion(self.image2latent(img_0), text_embeddings_0)
-        if self.use_lora:
+        if self.use_lora and lora_0 is not None and lora_1 is not None:
             self.unet = load_lora(self.unet, lora_0, lora_1, 1)
         img_noise_1 = self.ddim_inversion(self.image2latent(img_1), text_embeddings_1)
 

@@ -50,7 +50,8 @@ args = parser.parse_args()
 
 os.makedirs(args.output_path, exist_ok=True)
 pipeline = DiffMorpherPipeline.from_pretrained(
-    args.model_path, torch_dtype=torch.float32)
+    args.model_path, torch_dtype=torch.float32
+)
 pipeline.to("cuda")
 
 images = pipeline(
