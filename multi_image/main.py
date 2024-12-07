@@ -1,7 +1,6 @@
 import os
 import torch
 import numpy as np
-import cv2
 from PIL import Image
 from argparse import ArgumentParser
 from model import DiffMorpherPipeline
