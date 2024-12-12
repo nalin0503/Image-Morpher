@@ -3,9 +3,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 
 def calc_mean_std(feat, eps=1e-5):
-    # eps is a small value added to the variance to avoid divide-by-zero.
     size = feat.size()
-
     N, C = size[:2]
     feat_var = feat.view(N, C, -1).var(dim=2) + eps
     if len(size) == 3:
@@ -15,7 +13,6 @@ def calc_mean_std(feat, eps=1e-5):
         feat_std = feat_var.sqrt().view(N, C, 1, 1)
         feat_mean = feat.view(N, C, -1).mean(dim=2).view(N, C, 1, 1)
     return feat_mean, feat_std
-
 
 def get_img(img, resolution=512):
     norm_mean = [0.5, 0.5, 0.5]
@@ -30,20 +27,6 @@ def get_img(img, resolution=512):
 
 @torch.no_grad()
 def slerp(p0, p1, fract_mixing: float, adain=True):
-    r""" Copied from lunarring/latentblending
-    Helper function to correctly mix two random variables using spherical interpolation.
-    The function will always cast up to float64 for sake of extra 4.
-    Args:
-        p0: 
-            First tensor for interpolation
-        p1: 
-            Second tensor for interpolation
-        fract_mixing: float 
-            Mixing coefficient of interval [0, 1]. 
-            0 will return in p0
-            1 will return in p1
-            0.x will return a mix between both preserving angular velocity.
-    """
     if p0.dtype == torch.float16:
         recast_to = 'fp16'
     else:
@@ -81,6 +64,5 @@ def slerp(p0, p1, fract_mixing: float, adain=True):
     return interp
 
 def do_replace_attn(key: str):
-    # For stable diffusion cross-attention layers are often in modules named 'attn2'.
-    # So we return True if 'attn2' in the name, indicating cross-attention module.
+    # For SDXL, cross-attn layers often have 'attn2' in their names
     return 'attn2' in key

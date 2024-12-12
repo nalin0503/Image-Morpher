@@ -4,9 +4,11 @@ import numpy as np
 from PIL import Image
 from argparse import ArgumentParser
 from model import DiffMorpherPipeline
+import warnings
+warnings.filterwarning
 
 parser = ArgumentParser()
-parser.add_argument("--model_path", type=str, default="runwayml/stable-diffusion-v1-5")
+parser.add_argument("--model_path", type=str, default="stabilityai/stable-diffusion-xl-base-1.0")
 parser.add_argument("--image_path_0", type=str, default="")
 parser.add_argument("--prompt_0", type=str, default="")
 parser.add_argument("--image_path_1", type=str, default="")
@@ -28,7 +30,7 @@ parser.add_argument("--guidance_scale", type=float, default=1.0)
 parser.add_argument("--lora_steps", type=int, default=200)
 parser.add_argument("--lora_lr", type=float, default=2e-4)
 parser.add_argument("--lora_rank", type=int, default=16)
-parser.add_argument("--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdv1-5")
+parser.add_argument("--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdxl")
 
 args = parser.parse_args()
 

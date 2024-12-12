@@ -14,6 +14,8 @@ from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 from diffusers.models.attention_processor import AttnProcessor, LoRAAttnProcessor, LoRAAttnAddedKVProcessor
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
+import warnings
+warnings.filterwarnings('ignore')
 
 check_min_version("0.17.0")
 
@@ -61,50 +63,51 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     vae.to(device)
     text_encoder.to(device)
 
-    # Replace attention processors
+    print("DEBUG: Printing all UNet parameters before replacement:")
+    for n,p in unet.named_parameters():
+        print("UNet param:", n)
+
+    replaced_count = 0
     for name, module in unet.named_modules():
         if isinstance(module, AttnProcessor) and ('attn2' in name):
-            # Decide if we use LoRAAttnAddedKVProcessor or LoRAAttnProcessor
-            # If 'to_k' and 'to_v' are processed specially in attn2, we can try LoRAAttnAddedKVProcessor:
-            # Usually cross-attn uses LoRAAttnProcessor is enough. If you find 'added_kv' in stable diffusion 2.x only.
-            # For v1.5 standard cross-attn, LoRAAttnProcessor should suffice.
-            # If that fails, try LoRAAttnAddedKVProcessor.
-            # We'll try LoRAAttnProcessor first:
             parent = module.parent
             new_processor = LoRAAttnProcessor()
             setattr(parent, module.name, new_processor)
+            replaced_count += 1
 
-    # Create LoRA parameters:
+    print(f"DEBUG: Replaced {replaced_count} AttnProcessors with LoRAAttnProcessor.")
     lora_params = []
-    # Projections we look for in stable diffusion v1.5 cross attention:
-    # 'to_q.weight', 'to_k.weight', 'to_v.weight', 'to_out.0.weight'
-    # We'll do a second pass after replacing processors to find these params.
+    found_any = False
+
+    # After replacement, print the parent parameters of each LoRAAttnProcessor
     for name, module in unet.named_modules():
         if isinstance(module, LoRAAttnProcessor):
-            # Find parent parameters:
             attn_parent = module.parent
-            # module.lora_layers = {} to store LoRA weights for q,k,v,out
-            module.lora_layers = {}
-            proj_keys = ["to_q.weight","to_k.weight","to_v.weight","to_out.0.weight"]
             parent_params = dict(attn_parent.named_parameters())
+            print(f"DEBUG: LoRAAttnProcessor at {name}, parent: {attn_parent.__class__.__name__}")
+            print("DEBUG: Parent parameters keys:", parent_params.keys())
+
+            # Initially guess proj_keys. Adjust after seeing the printed keys.
+            proj_keys = ["to_q.weight","to_k.weight","to_v.weight","to_out.weight"]
+
+            module.lora_layers = {}
             for pk in proj_keys:
                 if pk in parent_params:
                     p = parent_params[pk]
                     out_dim, in_dim = p.shape
-                    # Create LoRA weights
                     lora_A = torch.nn.Parameter(torch.zeros((out_dim, lora_rank), device=device))
                     lora_B = torch.nn.Parameter(torch.zeros((lora_rank, in_dim), device=device))
                     torch.nn.init.normal_(lora_A, mean=0.0, std=0.01)
                     torch.nn.init.normal_(lora_B, mean=0.0, std=0.01)
-                    # store them
-                    key_base = pk.split('.')[0] # e.g., 'to_q' or 'to_out'
-                    if key_base == "to_out.0":
-                        key_base = "to_out" # normalize name
+                    key_base = pk.split('.')[0]
                     module.lora_layers[key_base] = (lora_A, lora_B)
                     lora_params.append(lora_A)
                     lora_params.append(lora_B)
+                    found_any = True
 
-    if len(lora_params) == 0:
+    if not found_any:
+        print("DEBUG: No LoRA parameters found with current proj_keys.")
+        print("DEBUG: Inspect the printed parameter keys above and update proj_keys accordingly.")
         raise ValueError("No LoRA parameters found. Check naming conventions or update code to match your model.")
 
     optimizer = torch.optim.AdamW(lora_params, lr=lora_lr, betas=(0.9,0.999), weight_decay=1e-2, eps=1e-08)
@@ -135,7 +138,10 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
         model_input = latents_dist.sample()*vae.config.scaling_factor
         noise = torch.randn_like(model_input)
         bsz,channels,height,width = model_input.shape
-        timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps,(bsz,),device=model_input.device).long()
+        timesteps = torch.randint(
+            0, noise_scheduler.config.num_train_timesteps, (bsz,),
+            device=model_input.device
+        ).long()
 
         noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
         model_pred = unet(noisy_model_input, timesteps, text_embedding).sample
