@@ -5,7 +5,7 @@ from PIL import Image
 from argparse import ArgumentParser
 from model import DiffMorpherPipeline
 import warnings
-warnings.filterwarning
+warnings.filterwarnings('ignore')
 
 parser = ArgumentParser()
 parser.add_argument("--model_path", type=str, default="stabilityai/stable-diffusion-xl-base-1.0")
