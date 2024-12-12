@@ -8,8 +8,8 @@ from PIL import Image
 from torchvision import transforms
 from transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 from diffusers import (StableDiffusionPipeline, LCMScheduler, 
-                       AutoencoderKL, UNet2DConditionModel, 
-                       StableDiffusionSafetyChecker)
+                       AutoencoderKL, UNet2DConditionModel)
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from argparse import ArgumentParser
 import inspect
 
