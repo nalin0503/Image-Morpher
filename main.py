@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 from argparse import ArgumentParser
 from model import DiffMorpherPipeline
-from moviepy.editor import ImageSequenceClip
+from moviepy import ImageSequenceClip
 
 parser = ArgumentParser()
 parser.add_argument("--model_path", type=str, default="stabilityai/stable-diffusion-xl-base-1.0",
