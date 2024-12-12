@@ -7,7 +7,7 @@ from model import DiffMorpherPipeline
 from moviepy import ImageSequenceClip
 
 parser = ArgumentParser()
-parser.add_argument("--model_path", type=str, default="stabilityai/stable-diffusion-xl-base-1.0",
+parser.add_argument("--model_path", type=str, default="runwayml/stable-diffusion-v1-5",
                     help="Pretrained base model, e.g. SDXL")
 parser.add_argument("--image_path_0", type=str, required=True, help="Path to the first image")
 parser.add_argument("--prompt_0", type=str, default="A painting of a man",
@@ -38,7 +38,7 @@ parser.add_argument("--guidance_scale", type=float, default=1.0,
 parser.add_argument("--lora_steps", type=int, default=200)
 parser.add_argument("--lora_lr", type=float, default=2e-4)
 parser.add_argument("--lora_rank", type=int, default=16)
-parser.add_argument("--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdxl",
+parser.add_argument("--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdv1-5",
                     help="HF Hub ID or local path to LCM-LoRA weights")
 parser.add_argument("--film_model_url", type=str, default="https://tfhub.dev/google/film/1",
                     help="TFHub URL for FILM model")
