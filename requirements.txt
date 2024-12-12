@@ -14,4 +14,4 @@ torchvision
 lpips
 
 
-pip install torch torchvision transformers diffusers accelerate tensorflow tensorflow-hub pillow numpy moviepy peft click pyparsing distro pexpect einops lpips
+pip install torch torchvision transformers diffusers accelerate tensorflow tensorflow-hub pillow numpy moviepy peft click pyparsing distro pexpect einops lpips moviepy
