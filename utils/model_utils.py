@@ -80,7 +80,7 @@ def slerp(p0, p1, fract_mixing: float, adain=True):
 
     return interp
 
-
 def do_replace_attn(key: str):
-    # return key.startswith('up_blocks.2') or key.startswith('up_blocks.3')
-    return key.startswith('up')
+    # For stable diffusion cross-attention layers are often in modules named 'attn2'.
+    # So we return True if 'attn2' in the name, indicating cross-attention module.
+    return 'attn2' in key
