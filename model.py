@@ -243,7 +243,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 weight_name = f"{output_path.split('/')[-1]}_lora_0.ckpt"
                 load_lora_path_0 = os.path.join(save_lora_dir, weight_name)
                 if not os.path.exists(load_lora_path_0):
-                    # Train LoRA for the first image
+                    # LoRA layers are currently present due to LCM-LoRA loaded.
                     train_lora(
                         img_0,
                         prompt_0,
@@ -258,6 +258,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         lora_lr=lora_lr,
                         weight_name=weight_name
                     )
+
                     # Free GPU memory
                     del self.unet
                     torch.cuda.empty_cache()
@@ -267,21 +268,26 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         self.base_model_path, subfolder="unet"
                     ).to(self.device)
 
-            # Load LoRA_0 from ckpt file
+                    # Re-apply LCM-LoRA so that LoRA layers are present again
+                    if lcm_lora_path is not None:
+                        self.load_lora_weights(lcm_lora_path)
+                        print("LCM-LoRA re-applied successfully for second training.")
+
+            # Load LoRA_0
             if load_lora_path_0.endswith(".safetensors"):
                 lora_0 = safetensors.torch.load_file(load_lora_path_0, device="cpu")
             else:
                 lora_0 = torch.load(load_lora_path_0, map_location="cpu")
 
-            # Load lora_0 into unet
-            self.unet = load_lora(self.unet, lora_0, lora_0, 0.0)  # Just load, alpha=0 means original weights + lora_0
+            # Just load lora_0 with alpha=0 to ensure LoRA layers exist
+            self.unet = load_lora(self.unet, lora_0, lora_0, 0.0)
             torch.cuda.empty_cache()
 
             if not load_lora_path_1:
                 weight_name = f"{output_path.split('/')[-1]}_lora_1.ckpt"
                 load_lora_path_1 = os.path.join(save_lora_dir, weight_name)
                 if not os.path.exists(load_lora_path_1):
-                    # Train LoRA for the second image
+                    # Train LoRA for the second image. LoRA layers need to be present.
                     train_lora(
                         img_1,
                         prompt_1,
@@ -301,18 +307,22 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                     del self.unet
                     torch.cuda.empty_cache()
 
-                    # Reload base UNet
+                    # Reload base UNet again
                     self.unet = UNet2DConditionModel.from_pretrained(
                         self.base_model_path, subfolder="unet"
                     ).to(self.device)
 
-            # Load LoRA_1 from ckpt file
+                    # Re-apply LCM-LoRA again to ensure LoRA parameters exist
+                    if lcm_lora_path is not None:
+                        self.load_lora_weights(lcm_lora_path)
+                        print("LCM-LoRA re-applied successfully before loading LoRA_1.")
+
+            # Load LoRA_1
             if load_lora_path_1.endswith(".safetensors"):
                 lora_1 = safetensors.torch.load_file(load_lora_path_1, device="cpu")
             else:
                 lora_1 = torch.load(load_lora_path_1, map_location="cpu")
 
-            # Both LoRAs are now available as lora_0, lora_1 and can be used during DDIM inversion and sampling
         else:
             lora_0 = lora_1 = None
 
