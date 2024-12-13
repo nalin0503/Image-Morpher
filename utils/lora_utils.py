@@ -11,7 +11,7 @@ from PIL import Image
 from torchvision import transforms
 import safetensors
 from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
-from diffusers.models.attention_processor import AttnProcessor, LoRAAttnProcessor, LoRAAttnAddedKVProcessor
+from diffusers.models.attention_processor import AttnProcessor, LoRAAttnProcessor
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
 import warnings
@@ -35,8 +35,10 @@ def encode_prompt(text_encoder, input_ids, attention_mask, text_encoder_use_atte
     prompt_embeds = prompt_embeds[0]
     return prompt_embeds
 
-def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, text_encoder=None, vae=None, unet=None,
-               noise_scheduler=None, lora_steps=200, lora_lr=2e-4, lora_rank=16, weight_name=None, safe_serialization=False, progress=tqdm):
+def train_lora(
+    image, prompt, save_lora_dir, model_path=None, tokenizer=None, text_encoder=None, vae=None, unet=None,
+    noise_scheduler=None, lora_steps=200, lora_lr=2e-4, lora_rank=16, weight_name=None, safe_serialization=False, progress=tqdm
+):
     accelerator = Accelerator(gradient_accumulation_steps=1)
     set_seed(0)
 
@@ -64,12 +66,13 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     text_encoder.to(device)
 
     print("DEBUG: Printing all UNet parameters before replacement:")
-    for n,p in unet.named_parameters():
+    for n, p in unet.named_parameters():
         print("UNet param:", n)
 
+    # Replace all AttnProcessors with LoRAAttnProcessor (no longer checking 'attn2' in name)
     replaced_count = 0
     for name, module in unet.named_modules():
-        if isinstance(module, AttnProcessor) and ('attn2' in name):
+        if isinstance(module, AttnProcessor):
             parent = module.parent
             new_processor = LoRAAttnProcessor()
             setattr(parent, module.name, new_processor)
@@ -79,35 +82,47 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
     lora_params = []
     found_any = False
 
-    # After replacement, print the parent parameters of each LoRAAttnProcessor
+    # Try to find LoRA parameters by substring matching
     for name, module in unet.named_modules():
         if isinstance(module, LoRAAttnProcessor):
             attn_parent = module.parent
             parent_params = dict(attn_parent.named_parameters())
             print(f"DEBUG: LoRAAttnProcessor at {name}, parent: {attn_parent.__class__.__name__}")
-            print("DEBUG: Parent parameters keys:", parent_params.keys())
+            print("DEBUG: Parent parameters keys:", list(parent_params.keys()))
 
-            # Initially guess proj_keys. Adjust after seeing the printed keys.
-            proj_keys = ["to_q.weight","to_k.weight","to_v.weight","to_out.weight"]
-
+            proj_keys = ["to_q", "to_k", "to_v", "to_out", "proj_in", "proj_out", "conv1", "conv2", "time_emb_proj"]
             module.lora_layers = {}
+
+            # Loop through each projection key and search parent_params keys
             for pk in proj_keys:
-                if pk in parent_params:
-                    p = parent_params[pk]
-                    out_dim, in_dim = p.shape
-                    lora_A = torch.nn.Parameter(torch.zeros((out_dim, lora_rank), device=device))
-                    lora_B = torch.nn.Parameter(torch.zeros((lora_rank, in_dim), device=device))
-                    torch.nn.init.normal_(lora_A, mean=0.0, std=0.01)
-                    torch.nn.init.normal_(lora_B, mean=0.0, std=0.01)
-                    key_base = pk.split('.')[0]
-                    module.lora_layers[key_base] = (lora_A, lora_B)
-                    lora_params.append(lora_A)
-                    lora_params.append(lora_B)
-                    found_any = True
+                matched_keys = [pn for pn in parent_params.keys() if pk in pn]
+                if len(matched_keys) > 0:
+                    # Normally, we expect one main parameter per proj key (e.g. to_q)
+                    # but stable diffusion might structure them as to_q.base_layer.weight, etc.
+                    # We will handle the main weight
+                    for matched_param in matched_keys:
+                        p = parent_params[matched_param]
+                        if p.ndim == 2:  # only create LoRA for linear weights
+                            out_dim, in_dim = p.shape
+                            lora_A = torch.nn.Parameter(torch.zeros((out_dim, lora_rank), device=device))
+                            lora_B = torch.nn.Parameter(torch.zeros((lora_rank, in_dim), device=device))
+                            torch.nn.init.normal_(lora_A, mean=0.0, std=0.01)
+                            torch.nn.init.normal_(lora_B, mean=0.0, std=0.01)
+                            # Create a unique key_base by removing everything after a dot
+                            # except the main proj name
+                            # e.g. "attn1.to_q.base_layer.weight" -> key_base = "to_q"
+                            # We'll just reuse pk as the key_base
+                            key_base = pk
+                            module.lora_layers[key_base] = (lora_A, lora_B)
+                            lora_params.append(lora_A)
+                            lora_params.append(lora_B)
+                            found_any = True
+                            # Assuming one set per key, break after first match
+                            break
 
     if not found_any:
         print("DEBUG: No LoRA parameters found with current proj_keys.")
-        print("DEBUG: Inspect the printed parameter keys above and update proj_keys accordingly.")
+        print("DEBUG: Inspect the printed parameter keys above and adjust code if needed.")
         raise ValueError("No LoRA parameters found. Check naming conventions or update code to match your model.")
 
     optimizer = torch.optim.AdamW(lora_params, lr=lora_lr, betas=(0.9,0.999), weight_decay=1e-2, eps=1e-08)
@@ -137,7 +152,7 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
         unet.train()
         model_input = latents_dist.sample()*vae.config.scaling_factor
         noise = torch.randn_like(model_input)
-        bsz,channels,height,width = model_input.shape
+        bsz, channels, height, width = model_input.shape
         timesteps = torch.randint(
             0, noise_scheduler.config.num_train_timesteps, (bsz,),
             device=model_input.device
