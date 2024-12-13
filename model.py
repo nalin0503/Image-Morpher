@@ -244,9 +244,21 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 weight_name = f"{output_path.split('/')[-1]}_lora_0.ckpt"
                 load_lora_path_0 = os.path.join(save_lora_dir, weight_name)
                 if not os.path.exists(load_lora_path_0):
-                    train_lora(img_0, prompt_0, save_lora_dir, self.tokenizer.name_or_path,
-                               self.tokenizer, self.text_encoder, self.vae, self.unet,
-                               self.scheduler, lora_steps, lora_lr, lora_rank, weight_name=weight_name)
+                    train_lora(
+                        img_0,
+                        prompt_0,
+                        save_lora_dir,
+                        model_path=self.tokenizer.name_or_path,
+                        tokenizer=self.tokenizer,
+                        text_encoder=self.text_encoder,
+                        vae=self.vae,
+                        unet=self.unet,
+                        noise_scheduler=self.scheduler,
+                        lora_steps=lora_steps,
+                        lora_lr=lora_lr,
+                        lora_rank=lora_rank,
+                        weight_name=weight_name
+                    )
             if load_lora_path_0.endswith(".safetensors"):
                 lora_0 = safetensors.torch.load_file(load_lora_path_0, device="cpu")
             else:
@@ -256,9 +268,22 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 weight_name = f"{output_path.split('/')[-1]}_lora_1.ckpt"
                 load_lora_path_1 = os.path.join(save_lora_dir, weight_name)
                 if not os.path.exists(load_lora_path_1):
-                    train_lora(img_1, prompt_1, save_lora_dir, self.tokenizer.name_or_path,
-                               self.tokenizer, self.text_encoder, self.vae, self.unet,
-                               self.scheduler, lora_steps, lora_lr, lora_rank, weight_name=weight_name)
+                    train_lora(
+                        img_1,
+                        prompt_1,
+                        save_lora_dir,
+                        model_path=self.tokenizer.name_or_path,
+                        tokenizer=self.tokenizer,
+                        text_encoder=self.text_encoder,
+                        vae=self.vae,
+                        unet=self.unet,
+                        noise_scheduler=self.scheduler,
+                        lora_steps=lora_steps,
+                        lora_lr=lora_lr,
+                        lora_rank=lora_rank,
+                        weight_name=weight_name
+                    )
+
             if load_lora_path_1.endswith(".safetensors"):
                 lora_1 = safetensors.torch.load_file(load_lora_path_1, device="cpu")
             else:
