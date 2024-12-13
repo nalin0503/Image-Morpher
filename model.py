@@ -77,7 +77,6 @@ class LoadProcessor():
 
 
 class DiffMorpherPipeline(StableDiffusionPipeline):
-
     def __init__(self,
                  vae: AutoencoderKL,
                  text_encoder: CLIPTextModel,
@@ -87,102 +86,18 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                  safety_checker: StableDiffusionSafetyChecker,
                  feature_extractor: CLIPImageProcessor,
                  image_encoder=None,
-                 requires_safety_checker=True):
-        # LCMScheduler replaced stable schedulers for LCM-LoRA
-        sig = inspect.signature(super().__init__)
-        params = sig.parameters
-        if 'image_encoder' in params:
-            super().__init__(vae, text_encoder, tokenizer, unet, scheduler,
-                             safety_checker, feature_extractor, image_encoder, requires_safety_checker)
-        else:
-            super().__init__(vae, text_encoder, tokenizer, unet, scheduler,
-                             safety_checker, feature_extractor, requires_safety_checker)
+                 requires_safety_checker=True,
+                 model_path=None):
+        super().__init__(vae, text_encoder, tokenizer, unet, scheduler,
+                         safety_checker, feature_extractor, requires_safety_checker)
         self.img0_dict = {}
         self.img1_dict = {}
         self.use_lora = False
         self.use_adain = False
         self.use_reschedule = False
         self.output_path = "./results"
-
-    def image2latent(self, image):
-        DEVICE = self.device
-        if isinstance(image, Image.Image):
-            image = np.array(image)
-            image = torch.from_numpy(image).float()/127.5-1
-            image = image.permute(2,0,1).unsqueeze(0)
-        latents = self.vae.encode(image.to(DEVICE))['latent_dist'].mean
-        latents = latents*0.18215
-        return latents
-
-    def latent2image(self, latents, return_type='np'):
-        latents = 1/0.18215*latents.detach()
-        image = self.vae.decode(latents)['sample']
-        if return_type=='np':
-            image = (image/2+0.5).clamp(0,1)
-            image = image.cpu().permute(0,2,3,1).numpy()[0]
-            image = (image*255).astype(np.uint8)
-        return image
-
-    def ddim_inversion(self, latent, cond):
-        # Using standard DDIM inversion if needed:
-        timesteps = reversed(self.scheduler.timesteps)
-        with torch.autocast(device_type='cuda',dtype=torch.float32):
-            for i,t in enumerate(tqdm.tqdm(timesteps,desc="DDIM inversion")):
-                cond_batch = cond.repeat(latent.shape[0],1,1)
-                alpha_prod_t = self.scheduler.alphas_cumprod[t]
-                if i>0:
-                    alpha_prod_t_prev = self.scheduler.alphas_cumprod[list(timesteps)[i-1]]
-                else:
-                    alpha_prod_t_prev = self.scheduler.final_alpha_cumprod
-
-                mu = alpha_prod_t**0.5
-                mu_prev = alpha_prod_t_prev**0.5
-                sigma = (1 - alpha_prod_t)**0.5
-                sigma_prev = (1 - alpha_prod_t_prev)**0.5
-
-                eps = self.unet(latent, t, encoder_hidden_states=cond_batch).sample
-                pred_x0 = (latent - sigma_prev * eps)/mu_prev
-                latent = mu*pred_x0 + sigma*eps
-        return latent
-
-    def get_text_embeddings(self, prompt, guidance_scale, neg_prompt, batch_size):
-        DEVICE = self.device
-        text_input = self.tokenizer(prompt, padding="max_length", max_length=77, return_tensors="pt")
-        text_embeddings = self.text_encoder(text_input.input_ids.to(DEVICE))[0]
-        if guidance_scale > 1.:
-            uc_text = neg_prompt if neg_prompt else ""
-            unconditional_input = self.tokenizer([uc_text]*batch_size, padding="max_length", max_length=77, return_tensors="pt")
-            unconditional_embeddings = self.text_encoder(unconditional_input.input_ids.to(DEVICE))[0]
-            text_embeddings = torch.cat([unconditional_embeddings,text_embeddings],dim=0)
-        return text_embeddings
-
-    def cal_latent(self,num_inference_steps,guidance_scale,unconditioning,
-                   img_noise_0,img_noise_1,text_embeddings_0,text_embeddings_1,
-                   lora_0,lora_1,alpha,use_lora,fix_lora=None):
-        latents = slerp(img_noise_0,img_noise_1,alpha,self.use_adain)
-        text_embeddings = (1-alpha)*text_embeddings_0 + alpha*text_embeddings_1
-        self.scheduler.set_timesteps(num_inference_steps)
-        if use_lora and lora_0 is not None and lora_1 is not None:
-            if fix_lora is not None:
-                self.unet = load_lora(self.unet,lora_0,lora_1,fix_lora)
-            else:
-                self.unet = load_lora(self.unet,lora_0,lora_1,alpha)
-
-        for i,t in enumerate(tqdm.tqdm(self.scheduler.timesteps, desc=f"Sampling, alpha={alpha}")):
-            if guidance_scale>1.0:
-                model_inputs = torch.cat([latents]*2)
-            else:
-                model_inputs = latents
-            if unconditioning is not None and isinstance(unconditioning,list):
-                _, text_embeddings = text_embeddings.chunk(2)
-                text_embeddings = torch.cat([unconditioning[i].expand(*text_embeddings.shape),text_embeddings])
-
-            noise_pred = self.unet(model_inputs, t, encoder_hidden_states=text_embeddings).sample
-            if guidance_scale>1.0:
-                noise_pred_uncon, noise_pred_con = noise_pred.chunk(2,dim=0)
-                noise_pred = noise_pred_uncon + guidance_scale*(noise_pred_con-noise_pred_uncon)
-            latents = self.scheduler.step(noise_pred,t,latents,return_dict=False)[0]
-        return latents
+        # Store the base model path for reloading
+        self.base_model_path = model_path
 
     def __call__(self,
                  img_0=None,
@@ -240,16 +155,16 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
 
         # Train LoRAs if needed
         if self.use_lora:
+            # Train LoRA for img_0 if needed
             if not load_lora_path_0:
                 weight_name = f"{output_path.split('/')[-1]}_lora_0.ckpt"
                 load_lora_path_0 = os.path.join(save_lora_dir, weight_name)
                 if not os.path.exists(load_lora_path_0):
-                    # Train LoRA for the first image
                     train_lora(
                         img_0,
                         prompt_0,
                         save_lora_dir,
-                        model_path=self.tokenizer.name_or_path,
+                        model_path=self.base_model_path,
                         tokenizer=self.tokenizer,
                         text_encoder=self.text_encoder,
                         vae=self.vae,
@@ -259,35 +174,35 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         lora_lr=lora_lr,
                         weight_name=weight_name
                     )
-                    # Free GPU memory
+                    # Free memory
                     del self.unet
                     torch.cuda.empty_cache()
 
                     # Reload base UNet
                     self.unet = UNet2DConditionModel.from_pretrained(
-                        self.tokenizer.name_or_path, subfolder="unet"
+                        self.base_model_path, subfolder="unet"
                     ).to(self.device)
 
-            # Load LoRA_0 from ckpt file
+            # Load LoRA_0
             if load_lora_path_0.endswith(".safetensors"):
                 lora_0 = safetensors.torch.load_file(load_lora_path_0, device="cpu")
             else:
                 lora_0 = torch.load(load_lora_path_0, map_location="cpu")
 
-            # Load lora_0 into unet
-            self.unet = load_lora(self.unet, lora_0, lora_0, 0.0)  # Just load, alpha=0 means original weights + lora_0
+            # Apply LoRA_0
+            self.unet = load_lora(self.unet, lora_0, lora_0, 0.0)
             torch.cuda.empty_cache()
 
+            # Train LoRA for img_1 if needed
             if not load_lora_path_1:
                 weight_name = f"{output_path.split('/')[-1]}_lora_1.ckpt"
                 load_lora_path_1 = os.path.join(save_lora_dir, weight_name)
                 if not os.path.exists(load_lora_path_1):
-                    # Train LoRA for the second image
                     train_lora(
                         img_1,
                         prompt_1,
                         save_lora_dir,
-                        model_path=self.tokenizer.name_or_path,
+                        model_path=self.base_model_path,
                         tokenizer=self.tokenizer,
                         text_encoder=self.text_encoder,
                         vae=self.vae,
@@ -297,37 +212,42 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         lora_lr=lora_lr,
                         weight_name=weight_name
                     )
-
-                    # Free GPU memory after training second LoRA
+                    # Free memory
                     del self.unet
                     torch.cuda.empty_cache()
 
                     # Reload base UNet
                     self.unet = UNet2DConditionModel.from_pretrained(
-                        self.tokenizer.name_or_path, subfolder="unet"
+                        self.base_model_path, subfolder="unet"
                     ).to(self.device)
 
-            # Load LoRA_1 from ckpt file
+            # Load LoRA_1
             if load_lora_path_1.endswith(".safetensors"):
                 lora_1 = safetensors.torch.load_file(load_lora_path_1, device="cpu")
             else:
                 lora_1 = torch.load(load_lora_path_1, map_location="cpu")
-
-            # Both LoRAs are now available as lora_0, lora_1 and can be used during DDIM inversion and sampling
         else:
             lora_0 = lora_1 = None
 
+        # Proceed with rest of the code for DDIM inversion and morphing...
         text_embeddings_0 = self.get_text_embeddings(prompt_0, guidance_scale, neg_prompt, batch_size)
         text_embeddings_1 = self.get_text_embeddings(prompt_1, guidance_scale, neg_prompt, batch_size)
+
+        from utils.model_utils import get_img
         img_0 = get_img(img_0)
         img_1 = get_img(img_1)
 
-        # Perform DDIM inversion if needed (only if you want real-image morphing)
-        if self.use_lora:
-            self.unet = load_lora(self.unet, lora_0, lora_1, 0)
+        # If using lora, load the final pair now for DDIM inversion stages
+        if self.use_lora and lora_0 is not None and lora_1 is not None:
+            # For first image, alpha=0 means only lora_0 applied
+            self.unet = load_lora(self.unet, lora_0, lora_1, 0.0)
+
         img_noise_0 = self.ddim_inversion(self.image2latent(img_0), text_embeddings_0)
-        if self.use_lora:
-            self.unet = load_lora(self.unet, lora_0, lora_1, 1)
+
+        if self.use_lora and lora_0 is not None and lora_1 is not None:
+            # For second image, alpha=1 means only lora_1 applied
+            self.unet = load_lora(self.unet, lora_0, lora_1, 1.0)
+
         img_noise_1 = self.ddim_inversion(self.image2latent(img_1), text_embeddings_1)
 
         alpha_list = list(torch.linspace(0, 1, num_frames))
