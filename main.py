@@ -49,7 +49,7 @@ os.makedirs(args.output_path, exist_ok=True)
 os.makedirs(args.save_lora_dir, exist_ok=True)  # Ensure this directory is created
 
 pipeline = DiffMorpherPipeline.from_pretrained(
-    args.model_path, torch_dtype=torch.float16
+    args.model_path, torch_dtype=torch.float32
 ).to("cuda")
 
 # Ensure we pass a prompt to avoid the ValueError:
