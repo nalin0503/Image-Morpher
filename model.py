@@ -256,7 +256,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         noise_scheduler=self.scheduler,
                         lora_steps=lora_steps,
                         lora_lr=lora_lr,
-                        lora_rank=lora_rank,
+                        # lora_rank=lora_rank,
                         weight_name=weight_name
                     )
             if load_lora_path_0.endswith(".safetensors"):
@@ -280,7 +280,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         noise_scheduler=self.scheduler,
                         lora_steps=lora_steps,
                         lora_lr=lora_lr,
-                        lora_rank=lora_rank,
+                        # lora_rank=lora_rank,
                         weight_name=weight_name
                     )
 
