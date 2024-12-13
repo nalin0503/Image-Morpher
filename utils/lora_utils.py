@@ -11,7 +11,9 @@ from PIL import Image
 from torchvision import transforms
 import safetensors
 from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
-from diffusers.models.attention_processor import AttnProcessor, LoRAAttnProcessor
+from diffusers.models.attention_processor import (
+    AttnProcessor, LoRAAttnProcessor, AttnAddedKVProcessor, LoRAAttnAddedKVProcessor
+)
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
 import warnings
@@ -69,56 +71,58 @@ def train_lora(
     for n, p in unet.named_parameters():
         print("UNet param:", n)
 
-    # Replace all AttnProcessors with LoRAAttnProcessor (no longer checking 'attn2' in name)
+    # Attempt to replace attention processors:
     replaced_count = 0
     for name, module in unet.named_modules():
-        if isinstance(module, AttnProcessor):
+        # Check if it's an attention processor
+        # Some models might use AttnAddedKVProcessor, we must handle that too
+        if isinstance(module, AttnProcessor) and not isinstance(module, LoRAAttnProcessor):
+            # Replace with LoRAAttnProcessor
             parent = module.parent
             new_processor = LoRAAttnProcessor()
             setattr(parent, module.name, new_processor)
             replaced_count += 1
+        elif isinstance(module, AttnAddedKVProcessor) and not isinstance(module, LoRAAttnAddedKVProcessor):
+            # Replace with LoRAAttnAddedKVProcessor
+            parent = module.parent
+            new_processor = LoRAAttnAddedKVProcessor()
+            setattr(parent, module.name, new_processor)
+            replaced_count += 1
 
-    print(f"DEBUG: Replaced {replaced_count} AttnProcessors with LoRAAttnProcessor.")
+    print(f"DEBUG: Replaced {replaced_count} attention processors with LoRA equivalents.")
+
     lora_params = []
     found_any = False
 
-    # Try to find LoRA parameters by substring matching
+    # After replacement, we should have LoRA processors we can attach LoRA layers to.
+    proj_keys = ["to_q", "to_k", "to_v", "to_out", "proj_in", "proj_out", "conv1", "conv2", "time_emb_proj"]
+
     for name, module in unet.named_modules():
-        if isinstance(module, LoRAAttnProcessor):
+        if isinstance(module, (LoRAAttnProcessor, LoRAAttnAddedKVProcessor)):
             attn_parent = module.parent
             parent_params = dict(attn_parent.named_parameters())
-            print(f"DEBUG: LoRAAttnProcessor at {name}, parent: {attn_parent.__class__.__name__}")
+            print(f"DEBUG: LoRA processor at {name}, parent: {type(attn_parent).__name__}")
             print("DEBUG: Parent parameters keys:", list(parent_params.keys()))
 
-            proj_keys = ["to_q", "to_k", "to_v", "to_out", "proj_in", "proj_out", "conv1", "conv2", "time_emb_proj"]
             module.lora_layers = {}
-
-            # Loop through each projection key and search parent_params keys
+            # Try to find matches for each proj key in the parent's params
             for pk in proj_keys:
-                matched_keys = [pn for pn in parent_params.keys() if pk in pn]
-                if len(matched_keys) > 0:
-                    # Normally, we expect one main parameter per proj key (e.g. to_q)
-                    # but stable diffusion might structure them as to_q.base_layer.weight, etc.
-                    # We will handle the main weight
-                    for matched_param in matched_keys:
-                        p = parent_params[matched_param]
-                        if p.ndim == 2:  # only create LoRA for linear weights
-                            out_dim, in_dim = p.shape
-                            lora_A = torch.nn.Parameter(torch.zeros((out_dim, lora_rank), device=device))
-                            lora_B = torch.nn.Parameter(torch.zeros((lora_rank, in_dim), device=device))
-                            torch.nn.init.normal_(lora_A, mean=0.0, std=0.01)
-                            torch.nn.init.normal_(lora_B, mean=0.0, std=0.01)
-                            # Create a unique key_base by removing everything after a dot
-                            # except the main proj name
-                            # e.g. "attn1.to_q.base_layer.weight" -> key_base = "to_q"
-                            # We'll just reuse pk as the key_base
-                            key_base = pk
-                            module.lora_layers[key_base] = (lora_A, lora_B)
-                            lora_params.append(lora_A)
-                            lora_params.append(lora_B)
-                            found_any = True
-                            # Assuming one set per key, break after first match
-                            break
+                matched_keys = [pn for pn in parent_params.keys() if pk in pn and pn.endswith('.weight')]
+                # For each matched param, create LoRA weights if it's a linear param
+                for matched_param in matched_keys:
+                    p = parent_params[matched_param]
+                    if p.ndim == 2:  # linear weight
+                        out_dim, in_dim = p.shape
+                        lora_A = torch.nn.Parameter(torch.zeros((out_dim, lora_rank), device=device))
+                        lora_B = torch.nn.Parameter(torch.zeros((lora_rank, in_dim), device=device))
+                        torch.nn.init.normal_(lora_A, mean=0.0, std=0.01)
+                        torch.nn.init.normal_(lora_B, mean=0.0, std=0.01)
+                        # Use pk as the key_base
+                        key_base = pk
+                        module.lora_layers[key_base] = (lora_A, lora_B)
+                        lora_params.append(lora_A)
+                        lora_params.append(lora_B)
+                        found_any = True
 
     if not found_any:
         print("DEBUG: No LoRA parameters found with current proj_keys.")
@@ -177,7 +181,7 @@ def train_lora(
     # Save LoRA weights
     lora_state = {}
     for name, module in unet.named_modules():
-        if isinstance(module, LoRAAttnProcessor) and hasattr(module, 'lora_layers'):
+        if isinstance(module, (LoRAAttnProcessor, LoRAAttnAddedKVProcessor)) and hasattr(module, 'lora_layers'):
             for proj, (A,B) in module.lora_layers.items():
                 A_key = f"{name}.{proj}.lora_A.weight"
                 B_key = f"{name}.{proj}.lora_B.weight"
@@ -204,7 +208,7 @@ def load_lora(unet, lora_0, lora_1, alpha):
             combined[k] = (1 - alpha)*w0 + alpha*w1
 
     for name, module in unet.named_modules():
-        if isinstance(module, LoRAAttnProcessor) and hasattr(module, 'lora_layers'):
+        if isinstance(module, (LoRAAttnProcessor, LoRAAttnAddedKVProcessor)) and hasattr(module, 'lora_layers'):
             for proj in list(module.lora_layers.keys()):
                 A_key = f"{name}.{proj}.lora_A.weight"
                 B_key = f"{name}.{proj}.lora_B.weight"
