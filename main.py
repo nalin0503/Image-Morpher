@@ -54,6 +54,9 @@ pipeline = DiffMorpherPipeline.from_pretrained(
     args.model_path, torch_dtype=torch.float32
 ).to("cuda")
 
+# Store base_model_path on the pipeline for later use
+pipeline.base_model_path = args.model_path
+
 # Ensure we pass a prompt to avoid the ValueError:
 # We'll use prompt_0 as the main prompt for initial generation
 images = pipeline(
