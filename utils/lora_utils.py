@@ -78,7 +78,7 @@ def train_lora(
     # We look for parameters ending with lora_A.weight or lora_B.weight
     lora_params = []
     for n, p in unet.named_parameters():
-        if "lora_A.weight" in n or "lora_B.weight" in n:
+        if ("lora_A" in n and "weight" in n) or ("lora_B" in n and "weight" in n):
             p.requires_grad_(True)
             lora_params.append(p)
 
@@ -134,7 +134,7 @@ def train_lora(
     # We'll just dump all parameters with lora_A and lora_B to a dict
     lora_state = {}
     for n, p in unet.named_parameters():
-        if "lora_A.weight" in n or "lora_B.weight" in n:
+        if ("lora_A" in n and "weight" in n) or ("lora_B" in n and "weight" in n):
             lora_state[n] = p.detach().cpu()
 
     out_path = os.path.join(save_lora_dir, weight_name)
