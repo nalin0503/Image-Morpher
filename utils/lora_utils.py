@@ -39,135 +39,87 @@ def encode_prompt(text_encoder, input_ids, attention_mask, text_encoder_use_atte
 
 def train_lora(
     image, prompt, save_lora_dir, model_path=None, tokenizer=None, text_encoder=None, vae=None, unet=None,
-    noise_scheduler=None, lora_steps=200, lora_lr=2e-4, lora_rank=16, weight_name=None, safe_serialization=False, progress=tqdm
+    noise_scheduler=None, lora_steps=200, lora_lr=2e-4, weight_name="lora_weights.ckpt", safe_serialization=False, progress=tqdm
 ):
-    accelerator = Accelerator(gradient_accumulation_steps=1)
-    set_seed(0)
+    from accelerate import Accelerator
+    from diffusers.optimization import get_scheduler
+    from torchvision import transforms
+    import torch
+    import torch.nn.functional as F
+    from PIL import Image
+    import os
+    import safetensors
 
+    accelerator = Accelerator()
+    device = accelerator.device
+
+    # Load defaults if not provided
     if tokenizer is None:
         from transformers import AutoTokenizer
-        tokenizer = AutoTokenizer.from_pretrained(model_path, subfolder="tokenizer", revision=None, use_fast=False)
+        tokenizer = AutoTokenizer.from_pretrained(model_path, subfolder="tokenizer", use_fast=False)
     if noise_scheduler is None:
+        from diffusers import DDPMScheduler
         noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
     if text_encoder is None:
-        text_encoder_cls = import_model_class_from_model_name_or_path(model_path, revision=None)
-        text_encoder = text_encoder_cls.from_pretrained(model_path, subfolder="text_encoder", revision=None)
+        from transformers import CLIPTextModel
+        text_encoder = CLIPTextModel.from_pretrained(model_path, subfolder="text_encoder")
     if vae is None:
-        vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae", revision=None)
+        from diffusers import AutoencoderKL
+        vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae")
     if unet is None:
-        unet = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet", revision=None)
+        from diffusers import UNet2DConditionModel
+        unet = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet")
 
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    vae.to(device).eval().requires_grad_(False)
+    text_encoder.to(device).eval().requires_grad_(False)
+    unet.to(device).train()
 
-    vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
-    unet.requires_grad_(False)
-
-    unet.to(device)
-    vae.to(device)
-    text_encoder.to(device)
-
-    print("DEBUG: Printing all UNet parameters before replacement:")
-    for n, p in unet.named_parameters():
-        print("UNet param:", n)
-
-    # Attempt to replace attention processors:
-    replaced_count = 0
-    for name, module in unet.named_modules():
-        # Check if it's an attention processor
-        # Some models might use AttnAddedKVProcessor, we must handle that too
-        if isinstance(module, AttnProcessor) and not isinstance(module, LoRAAttnProcessor):
-            # Replace with LoRAAttnProcessor
-            parent = module.parent
-            new_processor = LoRAAttnProcessor()
-            setattr(parent, module.name, new_processor)
-            replaced_count += 1
-        elif isinstance(module, AttnAddedKVProcessor) and not isinstance(module, LoRAAttnAddedKVProcessor):
-            # Replace with LoRAAttnAddedKVProcessor
-            parent = module.parent
-            new_processor = LoRAAttnAddedKVProcessor()
-            setattr(parent, module.name, new_processor)
-            replaced_count += 1
-
-    print(f"DEBUG: Replaced {replaced_count} attention processors with LoRA equivalents.")
-
+    # Directly gather existing LoRA params
+    # We look for parameters ending with lora_A.weight or lora_B.weight
     lora_params = []
-    found_any = False
+    for n, p in unet.named_parameters():
+        if "lora_A.weight" in n or "lora_B.weight" in n:
+            p.requires_grad_(True)
+            lora_params.append(p)
 
-    # After replacement, we should have LoRA processors we can attach LoRA layers to.
-    proj_keys = ["to_q", "to_k", "to_v", "to_out", "proj_in", "proj_out", "conv1", "conv2", "time_emb_proj"]
+    if len(lora_params) == 0:
+        raise ValueError("No existing LoRA parameters found. Your model might not be LoRA-integrated, or naming changed.")
 
-    for name, module in unet.named_modules():
-        if isinstance(module, (LoRAAttnProcessor, LoRAAttnAddedKVProcessor)):
-            attn_parent = module.parent
-            parent_params = dict(attn_parent.named_parameters())
-            print(f"DEBUG: LoRA processor at {name}, parent: {type(attn_parent).__name__}")
-            print("DEBUG: Parent parameters keys:", list(parent_params.keys()))
-
-            module.lora_layers = {}
-            # Try to find matches for each proj key in the parent's params
-            for pk in proj_keys:
-                matched_keys = [pn for pn in parent_params.keys() if pk in pn and pn.endswith('.weight')]
-                # For each matched param, create LoRA weights if it's a linear param
-                for matched_param in matched_keys:
-                    p = parent_params[matched_param]
-                    if p.ndim == 2:  # linear weight
-                        out_dim, in_dim = p.shape
-                        lora_A = torch.nn.Parameter(torch.zeros((out_dim, lora_rank), device=device))
-                        lora_B = torch.nn.Parameter(torch.zeros((lora_rank, in_dim), device=device))
-                        torch.nn.init.normal_(lora_A, mean=0.0, std=0.01)
-                        torch.nn.init.normal_(lora_B, mean=0.0, std=0.01)
-                        # Use pk as the key_base
-                        key_base = pk
-                        module.lora_layers[key_base] = (lora_A, lora_B)
-                        lora_params.append(lora_A)
-                        lora_params.append(lora_B)
-                        found_any = True
-
-    if not found_any:
-        print("DEBUG: No LoRA parameters found with current proj_keys.")
-        print("DEBUG: Inspect the printed parameter keys above and adjust code if needed.")
-        raise ValueError("No LoRA parameters found. Check naming conventions or update code to match your model.")
-
-    optimizer = torch.optim.AdamW(lora_params, lr=lora_lr, betas=(0.9,0.999), weight_decay=1e-2, eps=1e-08)
+    optimizer = torch.optim.AdamW(lora_params, lr=lora_lr, betas=(0.9,0.999), weight_decay=1e-2)
     lr_scheduler = get_scheduler("constant", optimizer=optimizer, num_warmup_steps=0, num_training_steps=lora_steps)
 
-    unet = accelerator.prepare_model(unet)
-    optimizer = accelerator.prepare_optimizer(optimizer)
-    lr_scheduler = accelerator.prepare_scheduler(lr_scheduler)
+    unet, optimizer, lr_scheduler = accelerator.prepare(unet, optimizer, lr_scheduler)
 
+    # Tokenize prompt
+    max_length = tokenizer.model_max_length
+    text_inputs = tokenizer(prompt, truncation=True, padding="max_length", max_length=max_length, return_tensors="pt")
+    text_inputs = text_inputs.to(device)
     with torch.no_grad():
-        text_inputs = tokenize_prompt(tokenizer, prompt)
-        text_embedding = encode_prompt(text_encoder, text_inputs.input_ids, text_inputs.attention_mask, False)
+        prompt_embeds = text_encoder(text_inputs.input_ids)[0]
 
+    # Preprocess image
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
-
     image_transforms = transforms.Compose([
         transforms.Resize(512, interpolation=transforms.InterpolationMode.BILINEAR),
         transforms.ToTensor(),
         transforms.Normalize([0.5],[0.5])
     ])
-
-    image = image_transforms(image).to(device).unsqueeze(0)
+    image = image_transforms(image).unsqueeze(0).to(device)
     latents_dist = vae.encode(image).latent_dist
 
-    for _ in progress.tqdm(range(lora_steps), desc="Training LoRA..."):
-        unet.train()
-        model_input = latents_dist.sample()*vae.config.scaling_factor
+    for step in progress.trange(lora_steps, desc="Training LoRA"):
+        model_input = latents_dist.sample() * vae.config.scaling_factor
         noise = torch.randn_like(model_input)
-        bsz, channels, height, width = model_input.shape
-        timesteps = torch.randint(
-            0, noise_scheduler.config.num_train_timesteps, (bsz,),
-            device=model_input.device
-        ).long()
+        bsz = model_input.size(0)
+        timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=device).long()
 
         noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
-        model_pred = unet(noisy_model_input, timesteps, text_embedding).sample
+        model_pred = unet(noisy_model_input, timesteps, prompt_embeds).sample
 
-        if noise_scheduler.config.prediction_type=="epsilon":
+        if noise_scheduler.config.prediction_type == "epsilon":
             target = noise
-        elif noise_scheduler.config.prediction_type=="v_prediction":
+        elif noise_scheduler.config.prediction_type == "v_prediction":
             target = noise_scheduler.get_velocity(model_input, noise, timesteps)
         else:
             raise ValueError("Unknown prediction type")
@@ -178,21 +130,20 @@ def train_lora(
         lr_scheduler.step()
         optimizer.zero_grad()
 
-    # Save LoRA weights
+    # Save the LoRA weights
+    # We'll just dump all parameters with lora_A and lora_B to a dict
     lora_state = {}
-    for name, module in unet.named_modules():
-        if isinstance(module, (LoRAAttnProcessor, LoRAAttnAddedKVProcessor)) and hasattr(module, 'lora_layers'):
-            for proj, (A,B) in module.lora_layers.items():
-                A_key = f"{name}.{proj}.lora_A.weight"
-                B_key = f"{name}.{proj}.lora_B.weight"
-                lora_state[A_key] = A.detach().cpu()
-                lora_state[B_key] = B.detach().cpu()
+    for n, p in unet.named_parameters():
+        if "lora_A.weight" in n or "lora_B.weight" in n:
+            lora_state[n] = p.detach().cpu()
 
     out_path = os.path.join(save_lora_dir, weight_name)
     if safe_serialization:
         safetensors.torch.save_file(lora_state, out_path+".safetensors")
     else:
         torch.save(lora_state, out_path)
+
+    return unet
 
 def load_lora(unet, lora_0, lora_1, alpha):
     combined = {}
