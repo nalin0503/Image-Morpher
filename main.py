@@ -6,6 +6,8 @@ from argparse import ArgumentParser
 from model import DiffMorpherPipeline
 from moviepy import ImageSequenceClip
 
+print(f"Current memory allocated: {torch.cuda.memory_allocated()} bytes")
+
 parser = ArgumentParser()
 parser.add_argument("--model_path", type=str, default="runwayml/stable-diffusion-v1-5",
                     help="Pretrained base model, e.g. SDXL")
@@ -78,6 +80,8 @@ images = pipeline(
     lcm_lora_path=args.lcm_lora_path,
     prompt=args.prompt_0  # Now we explicitly provide a prompt
 )
+
+print(f"Peak memory allocated: {torch.cuda.max_memory_allocated()} bytes")
 
 # Save initial morph frames as a GIF
 images[0].save(f"{args.output_path}/output.gif", save_all=True,
