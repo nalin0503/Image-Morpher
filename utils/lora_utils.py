@@ -1,3 +1,7 @@
+"""
+currently this thing is training the u-net only for the lora... explains the deformed outputs ig 
+"""
+
 from timeit import default_timer as timer
 from datetime import timedelta
 from PIL import Image
