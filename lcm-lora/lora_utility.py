@@ -13,8 +13,8 @@ from model_utility import (
     import_model_class_from_model_name_or_path,
     tokenize_prompt,
     encode_prompt,
-    get_scheduler,
 )
+from diffusers.optimization import get_scheduler
 
 from diffusers import AutoencoderKL, UNet2DConditionModel
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
@@ -98,11 +98,11 @@ def train_lora(
     # 3) Load / check scheduler
     if noise_scheduler is None:
         # If you want Karras for training, do:
-        from diffusers import KarrasDiffusionSchedulers
-        noise_scheduler = KarrasDiffusionSchedulers.from_pretrained(model_path, subfolder="scheduler")
+        # from diffusers import KarrasDiffusionSchedulers
+        # noise_scheduler = KarrasDiffusionSchedulers.from_pretrained(model_path, subfolder="scheduler")
         # Otherwise DDPMScheduler or your chosen approach:
-        # from diffusers import DDPMScheduler
-        # noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
+        from diffusers import DDPMScheduler
+        noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
 
     # 4) Load / check text encoder
     if text_encoder is None:
