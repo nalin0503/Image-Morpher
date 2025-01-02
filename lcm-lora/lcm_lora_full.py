@@ -257,10 +257,10 @@ def main():
     pipe = DiffusionPipeline.from_pretrained(
         base_id, torch_dtype=torch.float16, variant="fp16"
     ).to(device)
-    pipe.scheduler = KarrasDiffusionSchedulers.from_config(pipe.scheduler.config)
+    # pipe.scheduler = KarrasDiffusionSchedulers.from_config(pipe.scheduler.config)
     # If you have an official LCM scheduler:
-    #   from diffusers import LCMScheduler
-    #   pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+    from diffusers import LCMScheduler
+    pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
 
     # Load LoRAs (including an LCM "acceleration vector" if needed)
     # Example:
