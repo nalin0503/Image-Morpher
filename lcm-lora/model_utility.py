@@ -30,13 +30,13 @@ def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: st
     if model_class == "CLIPTextModel":
         from transformers import CLIPTextModel
         return CLIPTextModel
-    elif model_class == "RobertaSeriesModelWithTransformation":
-        # If this import fails or warns, it might be for alt-diffusion
-        try:
-            from diffusers.pipelines.alt_diffusion.modeling_roberta_series import RobertaSeriesModelWithTransformation
-            return RobertaSeriesModelWithTransformation
-        except ImportError:
-            raise ValueError("Optional alt_diffusion model class not available.")
+    # elif model_class == "RobertaSeriesModelWithTransformation":
+    #     # If this import fails or warns, it might be for alt-diffusion
+    #     try:
+    #         from diffusers.pipelines import RobertaSeriesModelWithTransformation
+    #         return RobertaSeriesModelWithTransformation
+    #     except ImportError:
+    #         raise ValueError("Optional alt_diffusion model class not available.")
     elif model_class == "T5EncoderModel":
         from transformers import T5EncoderModel
         return T5EncoderModel

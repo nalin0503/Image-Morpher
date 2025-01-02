@@ -13,10 +13,9 @@ from lora_utility import train_lora
 
 from diffusers import (
     DiffusionPipeline,
-    AutoencoderKL,
-    # We'll use the KarrasDiffusionSchedulers as you prefer:
-    KarrasDiffusionSchedulers,
+    AutoencoderKL
 )
+from diffusers.schedulers import KarrasDiffusionSchedulers
 from transformers import CLIPTextModel, CLIPTokenizer
 
 ######################################

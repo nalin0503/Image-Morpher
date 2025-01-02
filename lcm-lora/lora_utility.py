@@ -6,14 +6,9 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 from torchvision import transforms
-from accelerate import Accelerator, set_seed
+from accelerate import Accelerator
 
-# You can adapt these imports based on your code organization
-from model_utility import (
-    import_model_class_from_model_name_or_path,
-    tokenize_prompt,
-    encode_prompt,
-)
+from model_utility import *
 from diffusers.optimization import get_scheduler
 
 from diffusers import AutoencoderKL, UNet2DConditionModel
@@ -83,7 +78,8 @@ def train_lora(
         gradient_accumulation_steps=1,
         # optionally: mixed_precision='fp16' or 'bf16'
     )
-    set_seed(0)
+    # skipping set_seed for the time being #TODO
+    # set_seed(0)
 
     # 2) Load / check tokenizer
     if tokenizer is None:
@@ -98,7 +94,7 @@ def train_lora(
     # 3) Load / check scheduler
     if noise_scheduler is None:
         # If you want Karras for training, do:
-        from diffusers import KarrasDiffusionSchedulers
+        from diffusers.schedulers import KarrasDiffusionSchedulers
         noise_scheduler = KarrasDiffusionSchedulers.from_pretrained(model_path, subfolder="scheduler")
         # Otherwise DDPMScheduler or your chosen approach:
         # from diffusers import DDPMScheduler

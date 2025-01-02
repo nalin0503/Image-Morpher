@@ -2,9 +2,10 @@ TO ADD:
 
 in lcm_lora_full.py: 
 
-1. text prompts interpolation.. (using slerp apparently, nope slerping is for latents... but can be for text embeddings also no? ) 
-2. negative embeddings in DDIM doesnt quite make sense, but apparently "experimental" 
-3. pytorch 2.0 for acceleration.... 
+1. text prompts interpolation.. (using slerp apparently, nope slerping is for latents... but can be for text embeddings also no? (later)
+2. negative embeddings in DDIM doesnt quite make sense, but apparently "experimental" (removed) 
+3. pytorch 2.0 for acceleration.... (explore)
+4. add FILM for intermediates (later)
 
 test out the lcm-lora folder code tomorrow. 
 - should probably seperate out main func from lcm_lora_full as the driver code.more modular - commit as "LCM code or smth"
@@ -19,7 +20,10 @@ then generate intermediates using text prompt interpolation (above)
 explore aidi instead of DDIM for inversion? 
 
 Later:
-post on HF as a website.  
+- text embed interpolate 
+- And obv FILM
+
+- post on HF as a website.  
 
 
 <p align="center">
