@@ -223,12 +223,16 @@ def train_lora(
 
         noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
 
+        time_ids = torch.zeros((text_embedding.shape[0], 1), 
+                               device=text_embedding.device, 
+                               dtype=text_embedding.dtype
+)
         # Provide the text embeds in added_cond_kwargs
         model_pred = unet(
             sample=noisy_model_input,
             timestep=timesteps,
             encoder_hidden_states=text_embedding,
-            added_cond_kwargs={"text_embeds": text_embedding},  # or also "time_ids"
+            added_cond_kwargs={"text_embeds": text_embedding, "time_ids": time_ids},  
         ).sample
 
         # MSE loss

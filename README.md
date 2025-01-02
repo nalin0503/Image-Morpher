@@ -16,6 +16,7 @@ adain normalisation and image correction as a post-processing step...
 to tune the right number of steps... check with FID and pick the lowest one 
 use auto image captioning for better initialisation of target images' prompts (can do manually too.. but to remove this req), 
 then generate intermediates using text prompt interpolation (above)
+- weighting the linear combi seems interesting (so weight the lora params and then addd... like an alpha for that (Check lcm-lora image morphing))
 
 explore aidi instead of DDIM for inversion? 
 
