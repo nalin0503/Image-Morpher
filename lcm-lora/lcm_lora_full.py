@@ -264,7 +264,7 @@ def main():
 
     # Load LoRAs (including an LCM "acceleration vector" if needed)
     # Example:
-    # pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl", adapter_name="lcm")
+    pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl", adapter_name="lcm")
     pipe.load_lora_weights(styleA_ckpt, adapter_name="styleA")
     pipe.load_lora_weights(styleB_ckpt, adapter_name="styleB")
 
@@ -308,13 +308,14 @@ def main():
         # blend styleA vs styleB
         wA = 1.0 - alpha
         wB = alpha
-        # If using an "acceleration vector," do: pipe.set_adapters(["lcm","styleA","styleB"], [1.0, wA, wB])
-        pipe.set_adapters(["styleA","styleB"], [wA, wB])
+        # If using an "acceleration vector," do: 
+        pipe.set_adapters(["lcm","styleA","styleB"], [1.0, wA, wB])
+        # pipe.set_adapters(["styleA","styleB"], [wA, wB])
 
         latentsT = latent_interp(latentsA, latentsB, alpha, use_slerp=True)
 
         # do forward pass with negative prompt if desired
-        negative_prompt = "blurry, low quality, oversaturated, random, incoherent"  # optional
+        negative_prompt = "blurry, low quality, oversaturated, random, incoherent"  # undesired features
         images = custom_pipe(
             prompt="A final, consistent morph of these two styles",
             negative_prompt=negative_prompt,
