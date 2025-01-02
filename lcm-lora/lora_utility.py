@@ -226,7 +226,14 @@ def train_lora(
         time_ids = torch.zeros((text_embedding.shape[0], 1), 
                                device=text_embedding.device, 
                                dtype=text_embedding.dtype
-)
+                               )
+        
+        # 1) Reshape from [B, C'] -> [B, 1, C']
+        time_embeds = time_embeds.unsqueeze(1)
+
+        # 2) Expand from [B, 1, C'] -> [B, seq_len, C']
+        time_embeds = time_embeds.expand(-1, text_embedding.shape[1], -1)
+
         # Provide the text embeds in added_cond_kwargs
         model_pred = unet(
             sample=noisy_model_input,
