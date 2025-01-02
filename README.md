@@ -1,3 +1,23 @@
+TO ADD: 
+
+in lcm_lora_full.py: 
+
+1. text prompts interpolation.. (using slerp apparently)
+2. negative embeddings in DDIM doesnt quite make sense, but apparently "experimental" 
+3.  
+
+test out the lcm-lora folder code tomorrow. 
+- should probably seperate out main func from lcm_lora_full as the driver code.more modular
+
+- do a new mass commit, new repo (for the lcm-lora code, and then the LCM-integrated diffmorpher approach seperately)
+
+
+
+
+
+
+
+
 <p align="center">
   <h1 align="center">DiffMorpher: Unleashing the Capability of Diffusion Models for Image Morphing</h1>
   <h3 align="center">CVPR 2024</h3>
