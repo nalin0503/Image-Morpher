@@ -93,12 +93,11 @@ def train_lora(
 
     # 3) Load / check scheduler
     if noise_scheduler is None:
-        # If you want Karras for training, do:
-        from diffusers.schedulers import KarrasDiffusionSchedulers
-        noise_scheduler = KarrasDiffusionSchedulers.from_pretrained(model_path, subfolder="scheduler")
-        # Otherwise DDPMScheduler or your chosen approach:
-        # from diffusers import DDPMScheduler
-        # noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
+        # If you want Karras for training, do (note that karras is just an enum )
+        # from diffusers.schedulers import KarrasDiffusionSchedulers
+        # noise_scheduler = KarrasDiffusionSchedulers.from_pretrained(model_path, subfolder="scheduler")
+        from diffusers import DPMSolverMultistepScheduler
+        noise_scheduler = DPMSolverMultistepScheduler.from_pretrained(model_path,subfolder="scheduler")
 
     # 4) Load / check text encoder
     if text_encoder is None:
