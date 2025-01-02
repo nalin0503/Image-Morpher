@@ -234,8 +234,8 @@ def main():
     os.makedirs(style_lora_dir, exist_ok=True)
 
     # Suppose we have two style images
-    styleA_img = "assets/vangogh.jpg"
-    styleB_img = "assets/pearlgirl.jpg"
+    styleA_img = "../assets/vangogh.jpg"
+    styleB_img = "../assets/pearlgirl.jpg"
 
     styleA_prompt = "oil painting of a man"
     styleB_prompt = "oil painting of a woman"
@@ -278,8 +278,8 @@ def main():
     custom_pipe.to(device)
 
     # 4) Invert two real images
-    imageA_path = "assets/vangogh.jpg"
-    imageB_path = "assets/pearlgirl.jpg"
+    imageA_path = "../assets/vangogh.jpg"
+    imageB_path = "../assets/pearlgirl.jpg"
     if not os.path.exists(imageA_path) or not os.path.exists(imageB_path):
         print("Warning: 'imageA.jpg' or 'imageB.jpg' not found, using placeholders.")
     imageA = Image.open(imageA_path).convert("RGB").resize((512, 512))
