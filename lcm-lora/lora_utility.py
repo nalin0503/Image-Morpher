@@ -214,36 +214,33 @@ def train_lora(
     for step in progress(range(lora_steps), desc="Training LoRA"):
         unet.train()
 
-        # sample latents from VAE
         model_input = latents_dist.sample() * scaling_factor
-
-        # Add random noise according to a random timestep
         noise = torch.randn_like(model_input)
-        bsz, channels, height, width = model_input.shape
         timesteps = torch.randint(
-            0, noise_scheduler.config.num_train_timesteps, (bsz,), device=model_input.device
+            0, noise_scheduler.config.num_train_timesteps, (model_input.shape[0],),
+            device=model_input.device
         ).long()
 
-        # forward diffusion
         noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
 
-        # Predict the noise residual
-        # model_pred = unet(noisy_model_input, timesteps, text_embedding).sample
-        model_pred = unet(sample=noisy_model_input,timestep=timesteps, 
-                          encoder_hidden_states=text_embedding,added_cond_kwargs={},  # or a real dict if you do advanced SDXL usage
-                            ).sample
+        # Provide the text embeds in added_cond_kwargs
+        model_pred = unet(
+            sample=noisy_model_input,
+            timestep=timesteps,
+            encoder_hidden_states=text_embedding,
+            added_cond_kwargs={"text_embeds": text_embedding},  # or also "time_ids"
+        ).sample
 
-        # Compute MSE loss w.r.t. the “true” noise
+        # MSE loss
         if noise_scheduler.config.prediction_type == "epsilon":
             target = noise
         elif noise_scheduler.config.prediction_type == "v_prediction":
             target = noise_scheduler.get_velocity(model_input, noise, timesteps)
         else:
-            raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+            raise ValueError(...)
 
         loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
         accelerator.backward(loss)
-
         optimizer.step()
         lr_scheduler.step()
         optimizer.zero_grad()
