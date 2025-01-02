@@ -2,6 +2,8 @@ TO ADD:
 
 in lcm_lora_full.py: 
 
+0. create another repo, create a main.py to run, that has the driver code. ask gpt to seperate lcm_lora_Full. 
+
 1. text prompts interpolation.. (using slerp apparently, nope slerping is for latents... but can be for text embeddings also no? (later)
 2. negative embeddings in DDIM doesnt quite make sense, but apparently "experimental" (removed) 
 3. pytorch 2.0 for acceleration.... (explore)

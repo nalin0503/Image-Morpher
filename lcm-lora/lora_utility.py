@@ -214,35 +214,36 @@ def train_lora(
     for step in progress(range(lora_steps), desc="Training LoRA"):
         unet.train()
 
+        # random latents
         model_input = latents_dist.sample() * scaling_factor
         noise = torch.randn_like(model_input)
         bsz = model_input.shape[0]
         timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=model_input.device).long()
 
+        # forward diffusion
         noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
 
-        # 1) We have text_embedding = shape [B, seq_len, text_hidden_dim]
-        #    Suppose we want time_embeds = shape [B, seq_len, some_time_dim]
-        time_dim = 128  # or some dimension you choose
-        time_embeds = torch.zeros(
-            (bsz, time_dim),
-            device=text_embedding.device,
-            dtype=text_embedding.dtype,
-        )
-        time_embeds = time_embeds.unsqueeze(1)  # => [B, 1, time_dim]
-        time_embeds = time_embeds.expand(-1, text_embedding.shape[1], -1)  
-        # => [B, seq_len, time_dim]
+        # At minimum, define time_ids so the model doesn't crash:
+        time_ids = torch.zeros((bsz, 1), device=text_embedding.device, dtype=torch.int64)
 
+        # If you want time_embeds:
+        time_dim = 128
+        time_embeds = torch.zeros((bsz, time_dim), device=text_embedding.device, dtype=text_embedding.dtype)
+        time_embeds = time_embeds.unsqueeze(1)
+        time_embeds = time_embeds.expand(-1, text_embedding.shape[1], -1)
+
+        # Provide the text + time in added_cond_kwargs
         model_pred = unet(
             sample=noisy_model_input,
             timestep=timesteps,
             encoder_hidden_states=text_embedding,
             added_cond_kwargs={
                 "text_embeds": text_embedding,
-                "time_embeds": time_embeds,
+                "time_ids": time_ids,
+                "time_embeds": time_embeds
             },
         ).sample
-        
+
         # MSE loss
         if noise_scheduler.config.prediction_type == "epsilon":
             target = noise
