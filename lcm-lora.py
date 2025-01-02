@@ -24,7 +24,7 @@ pipe.set_adapters(["lcm", "papercut"], adapter_weights=[1.0, 0.8])
 pipe.to(device="cuda", dtype=torch.float16)
 
 prompt = "papercut, a cute fox"
-negative_prompt = "blurry, low quality, oversaturated" # huh! so you can have a negative prompt too! #TODO
+negative_prompt = "blurry, low quality, oversaturated, random, incoherent" # huh! so you can have a negative prompt too! #TODO
 # maybe this can increase the quality of the image as well. 
 generator = torch.manual_seed(0) # what does this do? should just be controlling the randomness for reproducibility... yep
 image = pipe(prompt, negative_prompt = negative_prompt,

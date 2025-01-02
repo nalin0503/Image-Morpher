@@ -1,18 +1,22 @@
 import os
 import torch
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import LambdaLR
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 from torchvision import transforms
-from model_utility import *
-
 from accelerate import Accelerator, set_seed
-from diffusers import (
-    DDPMScheduler,
-    AutoencoderKL,
-    UNet2DConditionModel,
+
+# You can adapt these imports based on your code organization
+from model_utility import (
+    import_model_class_from_model_name_or_path,
+    tokenize_prompt,
+    encode_prompt,
+    get_scheduler,
 )
+
+from diffusers import AutoencoderKL, UNet2DConditionModel
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import (
     AttnAddedKVProcessor,
@@ -20,38 +24,30 @@ from diffusers.models.attention_processor import (
     AttnAddedKVProcessor2_0,
     LoRAAttnProcessor,
     LoRAAttnProcessor2_0,
-    # If using the "added KV" variant:
     LoRAAttnAddedKVProcessor,
 )
-# You will also need the following (or similar) helper functions
-# from your project, referencing the code from DiffMorpher:
-#
-#  - import_model_class_from_model_name_or_path (to load your text encoder class)
-#  - tokenize_prompt(...) (to tokenize the prompt into input_ids)
-#  - encode_prompt(...)   (to convert input_ids → text embeddings)
-#  - get_scheduler(...)   (to create lr_scheduler)
-#
-# Make sure these are imported or implemented in your project.
+# If you want to use a Karras scheduler for training (rather than DDPMScheduler),
+# you can adapt that here. e.g. from diffusers import KarrasDiffusionSchedulers
 
 def train_lora(
-    image, 
-    prompt, 
-    save_lora_dir, 
+    image,
+    prompt,
+    save_lora_dir,
     model_path=None,
-    tokenizer=None, 
-    text_encoder=None, 
-    vae=None, 
-    unet=None, 
+    tokenizer=None,
+    text_encoder=None,
+    vae=None,
+    unet=None,
     noise_scheduler=None,
-    lora_steps=200, 
-    lora_lr=2e-4, 
-    lora_rank=16, 
-    weight_name=None, 
-    safe_serialization=False, 
+    lora_steps=200,
+    lora_lr=2e-4,
+    lora_rank=16,
+    weight_name=None,
+    safe_serialization=False,
     progress=tqdm
 ):
     """
-    Train a LoRA on a single image (or small dataset) for a given `prompt`.
+    Train a LoRA on a single image (or small dataset) for a given prompt.
     This matches the DiffMorpher approach: freeze most of UNet, VAE, text_encoder,
     then learn rank-limited (LoRA) parameters for cross-attention layers.
 
@@ -65,7 +61,7 @@ def train_lora(
         model_path (str, optional):
             Path or HF repo ID containing the base model (if you haven't passed a loaded unet, etc.).
         tokenizer, text_encoder, vae, unet, noise_scheduler:
-            Already-initialized components. If None, they will be loaded from `model_path`.
+            Already-initialized components. If None, they will be loaded from model_path.
         lora_steps (int):
             Number of training steps for LoRA.
         lora_lr (float):
@@ -80,12 +76,12 @@ def train_lora(
             TQDM or similar progress bar utility.
 
     Returns:
-        None. Saves a LoRA file to `save_lora_dir/weight_name`.
+        None. Saves a LoRA file to save_lora_dir/weight_name.
     """
     # 1) Initialize Accelerator
     accelerator = Accelerator(
         gradient_accumulation_steps=1,
-        # optionally: mixed_precision='fp16' or 'bf16' if desired
+        # optionally: mixed_precision='fp16' or 'bf16'
     )
     set_seed(0)
 
@@ -101,11 +97,15 @@ def train_lora(
 
     # 3) Load / check scheduler
     if noise_scheduler is None:
-        noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
+        # If you want Karras for training, do:
+        from diffusers import KarrasDiffusionSchedulers
+        noise_scheduler = KarrasDiffusionSchedulers.from_pretrained(model_path, subfolder="scheduler")
+        # Otherwise DDPMScheduler or your chosen approach:
+        # from diffusers import DDPMScheduler
+        # noise_scheduler = DDPMScheduler.from_pretrained(model_path, subfolder="scheduler")
 
     # 4) Load / check text encoder
     if text_encoder is None:
-        from diffusers.utils.import_utils import import_model_class_from_model_name_or_path
         text_encoder_cls = import_model_class_from_model_name_or_path(model_path, revision=None)
         text_encoder = text_encoder_cls.from_pretrained(model_path, subfolder="text_encoder", revision=None)
 
@@ -173,7 +173,6 @@ def train_lora(
     )
 
     # 9) Learning rate scheduler
-    from .my_scheduler_utils import get_scheduler  # or wherever you keep this
     lr_scheduler = get_scheduler(
         "constant",
         optimizer=optimizer,
@@ -189,7 +188,6 @@ def train_lora(
     lr_scheduler = accelerator.prepare_scheduler(lr_scheduler)
 
     # 11) Text embeddings for the training prompt
-    from .model_utils import tokenize_prompt, encode_prompt  # or adapt to your paths
     with torch.no_grad():
         text_inputs = tokenize_prompt(tokenizer, prompt, tokenizer_max_length=None)
         text_embedding = encode_prompt(
@@ -216,7 +214,7 @@ def train_lora(
     scaling_factor = getattr(vae.config, "scaling_factor", 0.18215)
 
     # 13) Actual LoRA training loop
-    for _ in progress(range(lora_steps), desc="Training LoRA"):
+    for step in progress(range(lora_steps), desc="Training LoRA"):
         unet.train()
 
         # sample latents from VAE
@@ -251,9 +249,7 @@ def train_lora(
         optimizer.zero_grad()
 
     # 14) Save the trained LoRA
-    from diffusers.loaders import LoraLoaderMixin
     os.makedirs(save_lora_dir, exist_ok=True)
-
     LoraLoaderMixin.save_lora_weights(
         save_directory=save_lora_dir,
         unet_lora_layers=unet_lora_layers,
@@ -262,4 +258,5 @@ def train_lora(
         safe_serialization=safe_serialization,
     )
     accelerator.end_training()
+
     print(f"LoRA saved to: {os.path.join(save_lora_dir, weight_name or 'lora.ckpt')}")

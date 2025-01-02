@@ -1,4 +1,4 @@
-# model_utils.py
+# model_utility.py
 
 import torch
 import torch.nn.functional as F
@@ -7,7 +7,6 @@ from torch.optim.lr_scheduler import LambdaLR
 from transformers import PretrainedConfig
 from typing import Union, Optional
 from PIL import Image
-from model_utility import *
 
 ############################################
 # 1) import_model_class_from_model_name_or_path
@@ -80,8 +79,8 @@ def encode_prompt(text_encoder, input_ids, attention_mask, text_encoder_use_atte
     attention_mask = attention_mask.to(text_encoder.device) if text_encoder_use_attention_mask else None
 
     prompt_embeds = text_encoder(text_input_ids, attention_mask=attention_mask)
-    # By default, 'prompt_embeds' is a BaseModelOutputWithPooling (for CLIP) or similar
-    # We typically take [0] to get the last hidden state
+    # By default, 'prompt_embeds' is a BaseModelOutputWithPooling or similar
+    # We typically take [0] to get the last hidden state:
     prompt_embeds = prompt_embeds[0]
 
     return prompt_embeds
@@ -89,24 +88,6 @@ def encode_prompt(text_encoder, input_ids, attention_mask, text_encoder_use_atte
 
 ############################################
 # 4) get_scheduler
-############################################
-# Note: You must define or import SchedulerType and TYPE_TO_SCHEDULER_FUNCTION 
-# from wherever your project keeps them. e.g.:
-#
-#   from accelerate.utils import SchedulerType, TYPE_TO_SCHEDULER_FUNCTION
-#
-# or define them custom:
-#
-#   class SchedulerType(Enum):
-#       CONSTANT = "constant"
-#       # ...
-#
-#   TYPE_TO_SCHEDULER_FUNCTION = {
-#       SchedulerType.CONSTANT: <some lambda or function>,
-#       # ...
-#   }
-#
-# Adjust accordingly to match your codebase.
 ############################################
 def get_scheduler(
     name: Union[str, "SchedulerType"],
@@ -120,8 +101,8 @@ def get_scheduler(
 ) -> LambdaLR:
     """
     Unified API to instantiate a learning rate scheduler by name (e.g. "constant_with_warmup").
-    Requires a dict or function dispatch to map `name` (SchedulerType) to the appropriate
-    scheduler creation function.
+    Requires a dict or function dispatch to map name (SchedulerType) to the appropriate
+    creation function.
 
     Example usage:
         scheduler = get_scheduler(
@@ -131,39 +112,32 @@ def get_scheduler(
             num_training_steps=1000,
             num_cycles=2
         )
-
-    Raises:
-        ValueError if needed arguments (like num_warmup_steps) are missing for the chosen scheduler.
     """
+    from accelerate.utils import SchedulerType, TYPE_TO_SCHEDULER_FUNCTION
 
-    # If user passed a raw string, convert it to the enumerated type (if you use one)
-    # If you don't use an enum, you can skip or adapt this logic.
-    from accelerate.utils import SchedulerType  # or your custom import
     if not isinstance(name, SchedulerType):
         name = SchedulerType(name)
 
-    from accelerate.utils import TYPE_TO_SCHEDULER_FUNCTION  # or your custom dict of schedulers
-
     schedule_func = TYPE_TO_SCHEDULER_FUNCTION[name]
 
-    # For e.g. a 'constant' scheduler
+    # e.g. 'constant'
     if name == SchedulerType.CONSTANT:
         return schedule_func(optimizer, last_epoch=last_epoch)
 
-    # For e.g. a 'piecewise_constant' scheduler
+    # e.g. 'piecewise_constant'
     if name == SchedulerType.PIECEWISE_CONSTANT:
         return schedule_func(optimizer, step_rules=step_rules, last_epoch=last_epoch)
 
     # All others require num_warmup_steps
     if num_warmup_steps is None:
-        raise ValueError(f"{name} requires `num_warmup_steps`, please provide it.")
+        raise ValueError(f"{name} requires num_warmup_steps, please provide it.")
 
     if name == SchedulerType.CONSTANT_WITH_WARMUP:
         return schedule_func(optimizer, num_warmup_steps=num_warmup_steps, last_epoch=last_epoch)
 
     # All others also require num_training_steps
     if num_training_steps is None:
-        raise ValueError(f"{name} requires `num_training_steps`, please provide it.")
+        raise ValueError(f"{name} requires num_training_steps, please provide it.")
 
     if name == SchedulerType.COSINE_WITH_RESTARTS:
         return schedule_func(
