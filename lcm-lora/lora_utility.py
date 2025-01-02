@@ -228,7 +228,10 @@ def train_lora(
         noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
 
         # Predict the noise residual
-        model_pred = unet(noisy_model_input, timesteps, text_embedding).sample
+        # model_pred = unet(noisy_model_input, timesteps, text_embedding).sample
+        model_pred = unet(sample=noisy_model_input,timestep=timesteps, 
+                          encoder_hidden_states=text_embedding,added_cond_kwargs={},  # or a real dict if you do advanced SDXL usage
+                            ).sample
 
         # Compute MSE loss w.r.t. the “true” noise
         if noise_scheduler.config.prediction_type == "epsilon":
