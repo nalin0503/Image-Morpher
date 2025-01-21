@@ -2,16 +2,23 @@ TO ADD:
 
 in lcm_lora_full.py: 
 
-0. create another repo, create a main.py to run, that has the driver code. ask gpt to seperate lcm_lora_Full. 
+# 0. create another repo, create a main.py to run, that has the driver code. ask gpt to seperate lcm_lora_Full. (look at brown below)
+## 0.2 FIND SDXL implementation of training the u-net (ask 4o) and then fix the model_pred.
 
-1. text prompts interpolation.. (using slerp apparently, nope slerping is for latents... but can be for text embeddings also no? (later)
+#### important thing is making it functional. which it is not currently, it is not effectively using the diffusers library and the correct implementations
+# just make it a raise raise, debug every single part before moving forward. Ask chat function by function.... ensuring it works and all comes tgt later
+
+##### test out lcm-lora folder code tomorrow.
+
+1. text embedding interpolation.. (using slerp apparently, nope slerping is for latents... but can be for text embeddings also no? (later)
 2. negative embeddings in DDIM doesnt quite make sense, but apparently "experimental" (removed) 
 3. pytorch 2.0 for acceleration.... (explore)
 4. add FILM for intermediates (later)
 
-test out the lcm-lora folder code tomorrow. 
-- should probably seperate out main func from lcm_lora_full as the driver code.more modular - commit as "LCM code or smth"
-- do a new mass commit, new repo (for the lcm-lora code, and then the LCM-integrated diffmorpher approach seperately)
+test out the lcm-lora folder code tomorrow. Ok do these things. Make it cleaner and commit to a new repo, thats possible...
+- should probably seperate out main func from lcm_lora_full as the driver code.`more modular` - commit as "LCM code or smth"
+`- do a new mass commit, new repo (for the lcm-lora code, and then the LCM-integrated diffmorpher approach seperately, diff folders, same assets)`
+
 
 Some ideas - 
 adain normalisation and image correction as a post-processing step... 
@@ -20,7 +27,7 @@ use auto image captioning for better initialisation of target images' prompts (c
 then generate intermediates using text prompt interpolation (above)
 - weighting the linear combi seems interesting (so weight the lora params and then addd... like an alpha for that (Check lcm-lora image morphing))
 
-explore aidi instead of DDIM for inversion? 
+explore aidi instead of DDIM for inversion? no.
 
 Later:
 - text embed interpolate 

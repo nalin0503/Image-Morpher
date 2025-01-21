@@ -214,7 +214,8 @@ def train_lora(
     for step in progress(range(lora_steps), desc="Training LoRA"):
         unet.train()
 
-        # random latents
+        # random latents 
+        # its adding random noise. 
         model_input = latents_dist.sample() * scaling_factor
         noise = torch.randn_like(model_input)
         bsz = model_input.shape[0]
@@ -239,8 +240,9 @@ def train_lora(
             encoder_hidden_states=text_embedding,
             added_cond_kwargs={
                 "text_embeds": text_embedding,
-                "time_ids": time_ids,
-                "time_embeds": time_embeds
+                "time_embeds": time_embeds,
+                "time_ids": time_ids
+                
             },
         ).sample
 
