@@ -12,4 +12,4 @@ transformers==4.34.1
 torch
 torchvision
 lpips
-small-change-test
+small-change-lcm-lora
