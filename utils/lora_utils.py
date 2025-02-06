@@ -280,28 +280,36 @@ def load_lora(unet, lora_0, lora_1, alpha, use_lcm=False, lcm_weight=1.0, style_
     """LCM-LoRA + Style LoRA combination from technical report"""
     state_dict = {}
     
-    # Load and interpolate style LoRAs
-    with safetensors.safe_open(lora_0, framework="pt") as f:
-        lora_0_sd = {k: style_weight*(1-alpha)*v for k,v in f.items()}
-    with safetensors.safe_open(lora_1, framework="pt") as f: 
-        lora_1_sd = {k: style_weight*alpha*v for k,v in f.items()}
+    # If lora_0 is already a dict, use it directly; otherwise, open the file.
+    if isinstance(lora_0, dict):
+        lora_0_sd = {k: style_weight * (1 - alpha) * v for k, v in lora_0.items()}
+    else:
+        with safetensors.safe_open(lora_0, framework="pt") as f:
+            lora_0_sd = {k: style_weight * (1 - alpha) * v for k, v in f.items()}
     
-    # Merge style weights
+    # Same for lora_1.
+    if isinstance(lora_1, dict):
+        lora_1_sd = {k: style_weight * alpha * v for k, v in lora_1.items()}
+    else:
+        with safetensors.safe_open(lora_1, framework="pt") as f:
+            lora_1_sd = {k: style_weight * alpha * v for k, v in f.items()}
+    
+    # Merge style weights: τ_style = λ₁ * ( (1−α)·lora_0 + α·lora_1 )
     style_dict = {k: lora_0_sd[k] + lora_1_sd[k] for k in lora_0_sd}
     
     if use_lcm:
         # Load LCM base weights
         lcm_dict = get_lcm_base_weights(unet, lcm_weight)
-        
-        # Combine: τ_total = λ1·τ_style + λ2·τ_lcm
+        # Combine: τ_total = λ₁·τ_style + λ₂·τ_lcm, where λ₁=0.8 and λ₂=1.0 per the paper
         for k in style_dict:
             state_dict[k] = style_dict[k] + lcm_dict[k]
     else:
         state_dict = style_dict
     
-    # Original loading logic
+    # Load the combined weights into the UNet's attention processors
     unet.load_attn_procs(state_dict, adapter_name="combined")
     return unet
+
 
 def get_lcm_base_weights(unet, weight=1.0):
     """Extract LCM-LoRA weights from pre-loaded adapter"""
