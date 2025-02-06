@@ -8,7 +8,7 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="stabilityai/stable-diffusion-2-1-base",
+    "--model_path", type=str, default="stabilityai/stable-diffusion-v1-5", # TODO change to SDXL
     help="Pretrained model to use (default: %(default)s)"
 )
 parser.add_argument(
@@ -76,7 +76,7 @@ parser.add_argument(
     help="Enable LCM-LoRA acceleration (default: %(default)s)" # to activate
 )
 parser.add_argument(
-    "--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdxl",
+    "--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdv1-5",
     help="Path to LCM-LoRA weights (default: %(default)s)"
 )
 parser.add_argument(
