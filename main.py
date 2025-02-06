@@ -8,7 +8,7 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="stabilityai/stable-diffusion-v1-5", # TODO change to SDXL
+    "--model_path", type=str, default="sd-legacy/stable-diffusion-v1-5", # TODO change to SDXL
     help="Pretrained model to use (default: %(default)s)"
 )
 parser.add_argument(
