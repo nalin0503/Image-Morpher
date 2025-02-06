@@ -3,6 +3,7 @@ from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.attention_processor import AttnProcessor
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
+from diffusers import LCMScheduler
 import torch
 import torch.nn.functional as F
 import tqdm
@@ -115,6 +116,36 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                              safety_checker, feature_extractor, requires_safety_checker)
         self.img0_dict = dict()
         self.img1_dict = dict()
+        # Add LCM scheduler config
+        self.lcm_scheduler = LCMScheduler.from_config(self.scheduler.config)
+        self.lcm_loaded = False
+
+    def load_lcm_lora(self, lcm_lora_path="latent-consistency/lcm-lora-sdxl"):
+        """LCM-LoRA initialization with attention replacement"""
+        from diffusers.models.attention import LCMAttnProcessor2_0
+        from diffusers.loaders import LoraLoaderMixin
+        from utils.model_utils import replace_attn_processors
+        
+        # 1. Replace attention processors
+        replace_attn_processors(self.unet, use_lcm=True)
+        
+        # 2. Load LoRA weights
+        LoraLoaderMixin.load_lora_weights(
+            self,
+            pretrained_model_name_or_path_or_dict=lcm_lora_path,
+            adapter_name="lcm"
+        )
+        
+        # 3. Configure scheduler
+        self.lcm_scheduler = LCMScheduler(
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="linear", 
+            prediction_type="epsilon",
+            timestep_spacing="leading"
+            )
+    
+        self.lcm_loaded = True
 
     def inv_step(
         self,
@@ -301,21 +332,37 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         return image  # range [-1, 1]
 
     @torch.no_grad()
-    def cal_latent(self, num_inference_steps, guidance_scale, unconditioning, img_noise_0, img_noise_1, text_embeddings_0, text_embeddings_1, lora_0, lora_1, alpha, use_lora, fix_lora=None):
+    def cal_latent(self, num_inference_steps, guidance_scale, unconditioning, img_noise_0, img_noise_1, 
+                   text_embeddings_0, text_embeddings_1, lora_0, lora_1, alpha, use_lora, use_lcm=False,
+                   lcm_lora_path=None,fix_lora=None):
         # latents = torch.cos(alpha * torch.pi / 2) * img_noise_0 + \
         #     torch.sin(alpha * torch.pi / 2) * img_noise_1
         # latents = (1 - alpha) * img_noise_0 + alpha * img_noise_1
         # latents = latents / ((1 - alpha) ** 2 + alpha ** 2)
+        
+        # LCM-specific initialization
+        if use_lcm:
+            if not self.lcm_loaded and lcm_lora_path:
+                self.load_lcm_lora(lcm_lora_path)
+                
+            # Switch to LCM scheduler and parameters
+            self.scheduler = self.lcm_scheduler
+            num_inference_steps = min(num_inference_steps, 8)  # LCM max steps
+            guidance_scale = max(min(guidance_scale, 2.0), 1.0)
+
         latents = slerp(img_noise_0, img_noise_1, alpha, self.use_adain)
         text_embeddings = (1 - alpha) * text_embeddings_0 + \
             alpha * text_embeddings_1
 
         self.scheduler.set_timesteps(num_inference_steps)
+        # Modified LoRA loading with LCM combination
         if use_lora:
-            if fix_lora is not None:
-                self.unet = load_lora(self.unet, lora_0, lora_1, fix_lora)
-            else:
-                self.unet = load_lora(self.unet, lora_0, lora_1, alpha)
+            self.unet = load_lora(
+                self.unet, lora_0, lora_1, alpha, 
+                use_lcm=use_lcm,  # New flag
+                lcm_weight=1.0,    # From technical report
+                style_weight=0.8   # λ1=0.8
+            ) 
 
         for i, t in enumerate(tqdm.tqdm(self.scheduler.timesteps, desc=f"DDIM Sampler, alpha={alpha}")):
 
@@ -336,8 +383,19 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 noise_pred = noise_pred_uncon + guidance_scale * \
                     (noise_pred_con - noise_pred_uncon)
             # compute the previous noise sample x_t -> x_t-1
-            latents = self.scheduler.step(
-                noise_pred, t, latents, return_dict=False)[0]
+
+        # LCM-optimized sampling loop
+            if use_lcm:
+                # LCM-specific step without classifier-free guidance
+                latents = self.scheduler.step(
+                    noise_pred, t, latents, 
+                    guidance_scale=guidance_scale,
+                    eta=0.0,  # Deterministic sampling
+                    use_low_order=True
+                ).prev_sample
+            else:
+                latents = self.scheduler.step(
+                    noise_pred, t, latents, return_dict=False)[0]
         return latents
 
     @torch.no_grad()

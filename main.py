@@ -70,6 +70,23 @@ parser.add_argument(
 parser.add_argument(
     "--no_lora", action="store_true"
 )
+# LCM-LoRA params
+parser.add_argument(
+    "--use_lcm", action="store_true",
+    help="Enable LCM-LoRA acceleration (default: %(default)s)" # to activate
+)
+parser.add_argument(
+    "--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdxl",
+    help="Path to LCM-LoRA weights (default: %(default)s)"
+)
+parser.add_argument(
+    "--lcm_steps", type=int, default=4,
+    help="Number of LCM inference steps (default: %(default)s)"
+)
+parser.add_argument(
+    "--lcm_guidance", type=float, default=1.5,
+    help="Guidance scale for LCM (default: %(default)s)"
+)
 
 args = parser.parse_args()
 
@@ -92,7 +109,11 @@ images = pipeline(
     num_frames=args.num_frames,
     fix_lora=args.fix_lora_value,
     save_intermediates=args.save_inter,
-    use_lora=not args.no_lora
+    use_lora=not args.no_lora,
+    use_lcm=args.use_lcm,
+    lcm_lora_path=args.lcm_lora_path,
+    num_inference_steps=args.lcm_steps if args.use_lcm else 50,
+    guidance_scale=args.lcm_guidance if args.use_lcm else 7.5
 )
 images[0].save(f"{args.output_path}/output.gif", save_all=True,
                append_images=images[1:], duration=args.duration, loop=0)

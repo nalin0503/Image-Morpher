@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
+from diffusers.models.attention import LCMAttnProcessor2_0
+from diffusers.models.attention_processor import AttnProcessor
 
 def calc_mean_std(feat, eps=1e-5):
     # eps is a small value added to the variance to avoid divide-by-zero.
@@ -80,6 +82,16 @@ def slerp(p0, p1, fract_mixing: float, adain=True):
 
     return interp
 
+
+def replace_attn_processors(model, use_lcm=False):
+    """Replace attention processors based on LCM flag"""
+    for name, module in model.named_modules():
+        if "attn" in name:
+            if use_lcm:
+                module.processor = LCMAttnProcessor2_0()
+            else:
+                module.processor = AttnProcessor()
+    return model
 
 def do_replace_attn(key: str):
     # return key.startswith('up_blocks.2') or key.startswith('up_blocks.3')

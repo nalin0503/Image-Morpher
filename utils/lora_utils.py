@@ -13,6 +13,7 @@ from accelerate.utils import set_seed
 from packaging import version
 from PIL import Image
 import tqdm
+import safetensors
 
 from transformers import AutoTokenizer, PretrainedConfig
 
@@ -275,9 +276,33 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
         safe_serialization=safe_serialization
     )
     
-def load_lora(unet, lora_0, lora_1, alpha):
-    lora = {}
-    for key in lora_0:
-        lora[key] = (1 - alpha) * lora_0[key] + alpha * lora_1[key]
-    unet.load_attn_procs(lora)
+def load_lora(unet, lora_0, lora_1, alpha, use_lcm=False, lcm_weight=1.0, style_weight=0.8):
+    """LCM-LoRA + Style LoRA combination from technical report"""
+    state_dict = {}
+    
+    # Load and interpolate style LoRAs
+    with safetensors.safe_open(lora_0, framework="pt") as f:
+        lora_0_sd = {k: style_weight*(1-alpha)*v for k,v in f.items()}
+    with safetensors.safe_open(lora_1, framework="pt") as f: 
+        lora_1_sd = {k: style_weight*alpha*v for k,v in f.items()}
+    
+    # Merge style weights
+    style_dict = {k: lora_0_sd[k] + lora_1_sd[k] for k in lora_0_sd}
+    
+    if use_lcm:
+        # Load LCM base weights
+        lcm_dict = get_lcm_base_weights(unet, lcm_weight)
+        
+        # Combine: τ_total = λ1·τ_style + λ2·τ_lcm
+        for k in style_dict:
+            state_dict[k] = style_dict[k] + lcm_dict[k]
+    else:
+        state_dict = style_dict
+    
+    # Original loading logic
+    unet.load_attn_procs(state_dict, adapter_name="combined")
     return unet
+
+def get_lcm_base_weights(unet, weight=1.0):
+    """Extract LCM-LoRA weights from pre-loaded adapter"""
+    return {k: weight*v for k,v in unet.attn_processors["lcm"].state_dict().items()}
