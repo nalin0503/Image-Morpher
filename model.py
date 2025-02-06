@@ -3,7 +3,7 @@ from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.attention_processor import AttnProcessor
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers import LCMScheduler
+from diffusers.schedulers.scheduling_lcm import LCMScheduler
 import torch
 import torch.nn.functional as F
 import tqdm
@@ -117,7 +117,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.img0_dict = dict()
         self.img1_dict = dict()
         # Add LCM scheduler config
-        self.lcm_scheduler = LCMScheduler.from_config(self.scheduler.config)
+        self.lcm_scheduler = LCMScheduler.from_config(self.scheduler.config) 
         self.lcm_loaded = False
 
     def load_lcm_lora(self, lcm_lora_path="latent-consistency/lcm-lora-sdxl"):
@@ -137,7 +137,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         )
         
         # 3. Configure scheduler
-        self.lcm_scheduler = LCMScheduler(
+        # LCMScheduler includes the LCM multi-step sampler.
+        self.lcm_scheduler = LCMScheduler( 
             beta_start=0.00085,
             beta_end=0.012,
             beta_schedule="linear", 

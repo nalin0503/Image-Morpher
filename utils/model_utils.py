@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
-from diffusers.models.attention import LCMAttnProcessor2_0
+from diffusers.models.attention_processor import LoRAAttnProcessor2_0
 from diffusers.models.attention_processor import AttnProcessor
 
 def calc_mean_std(feat, eps=1e-5):
@@ -88,7 +88,7 @@ def replace_attn_processors(model, use_lcm=False):
     for name, module in model.named_modules():
         if "attn" in name:
             if use_lcm:
-                module.processor = LCMAttnProcessor2_0()
+                module.processor = LoRAAttnProcessor2_0()
             else:
                 module.processor = AttnProcessor()
     return model
