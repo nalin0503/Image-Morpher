@@ -297,7 +297,7 @@ def load_lora(unet, lora_0, lora_1, alpha, use_lcm=False, lcm_weight=1.0, style_
     # Merge style weights: τ_style = λ₁ * ( (1−α)·lora_0 + α·lora_1 )
     style_dict = {k: lora_0_sd[k] + lora_1_sd[k] for k in lora_0_sd}
     
-    if use_lcm:
+    if use_lcm: # TODO only use during inference 
         # Load LCM base weights
         lcm_dict = get_lcm_base_weights(unet, lcm_weight)
         # Combine: τ_total = λ₁·τ_style + λ₂·τ_lcm, where λ₁=0.8 and λ₂=1.0 per the paper
