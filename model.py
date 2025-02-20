@@ -3,7 +3,7 @@ from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.attention_processor import AttnProcessor
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.schedulers.scheduling_lcm import LCMScheduler
+from lcm_schedule import LCMScheduler
 import torch
 import torch.nn.functional as F
 import tqdm
