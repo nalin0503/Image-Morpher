@@ -120,9 +120,9 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.lcm_scheduler = LCMScheduler.from_config(self.scheduler.config) 
         self.lcm_loaded = False # to ensure LCM-LoRA is loaded only once
     
-    def load_lcm_lora(self, lcm_lora_path="latent-consistency/lcm-lora-sdxl"):
+    def load_lcm_lora(self, lcm_lora_path="latent-consistency/lcm-lora-sdxl"): # TODO FIX
         """LCM-LoRA initialization with attention replacement"""
-        from diffusers.models.attention import LCMAttnProcessor2_0
+        from diffusers.models.attention import LCMAttnProcessor2_0 # TODO FIX 
         from diffusers.loaders import LoraLoaderMixin
         from utils.model_utils import replace_attn_processors
         
