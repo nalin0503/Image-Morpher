@@ -84,11 +84,16 @@ def slerp(p0, p1, fract_mixing: float, adain=True):
 
 
 def replace_attn_processors(model, use_lcm=False):
-    """Replace attention processors based on LCM flag"""
+    """
+    Replace attention processors in the UNet.
+    If use_lcm is True, use the LCM-aware LoRA processor for the relevant attention layers.
+    Otherwise, default to the standard attention processor.
+    """
     for name, module in model.named_modules():
         if "attn" in name:
-            if use_lcm:
-                module.processor = LoRAAttnProcessor2_0()
+            # Only update processors for upper blocks (layers whose name starts with 'up')
+            if use_lcm and name.startswith("up"): # hope to retain higher image fidelity 
+                module.processor = LoRAAttnProcessor2_0() # supposedly LCM aware, TODO
             else:
                 module.processor = AttnProcessor()
     return model

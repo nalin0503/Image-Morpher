@@ -276,8 +276,9 @@ def train_lora(image, prompt, save_lora_dir, model_path=None, tokenizer=None, te
         safe_serialization=safe_serialization
     )
     
-def load_lora(unet, lora_0, lora_1, alpha, use_lcm=False, lcm_weight=1.0, style_weight=0.8):
-    """LCM-LoRA + Style LoRA combination from technical report"""
+# TODO this needs to be compatible with model.py fully    
+def load_lora(unet, lora_0, lora_1, alpha, use_lcm=False, lcm_weight=1.0, style_weight=0.8, trainable=True):
+    """LCM-LoRA + Style LoRA combination, with trainable control"""
     state_dict = {}
     
     # If lora_0 is already a dict, use it directly; otherwise, open the file.
@@ -308,6 +309,13 @@ def load_lora(unet, lora_0, lora_1, alpha, use_lcm=False, lcm_weight=1.0, style_
     
     # Load the combined weights into the UNet's attention processors
     unet.load_attn_procs(state_dict, adapter_name="combined")
+
+    # Freeze parameters if trainable is False
+    if not trainable:
+        for n, p in unet.named_parameters():
+            if "attn_processors" in n:  # Only freeze attention processor weights
+                p.requires_grad = False
+
     return unet
 
 

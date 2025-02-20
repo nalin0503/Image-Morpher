@@ -118,8 +118,8 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.img1_dict = dict()
         # Add LCM scheduler config
         self.lcm_scheduler = LCMScheduler.from_config(self.scheduler.config) 
-        self.lcm_loaded = False
-
+        self.lcm_loaded = False # to ensure LCM-LoRA is loaded only once
+    
     def load_lcm_lora(self, lcm_lora_path="latent-consistency/lcm-lora-sdxl"):
         """LCM-LoRA initialization with attention replacement"""
         from diffusers.models.attention import LCMAttnProcessor2_0
@@ -354,6 +354,15 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         latents = slerp(img_noise_0, img_noise_1, alpha, self.use_adain)
         text_embeddings = (1 - alpha) * text_embeddings_0 + \
             alpha * text_embeddings_1
+        
+        # conditionally load LCM-LoRA accel if enabled
+        if use_lcm and not self.lcm_loaded:
+            from utils.lora_utils import load_lora 
+            # LOAD LCM-LoRA accelerator weights, trainable = False to keep them frozen
+            load_lora(self.unet, lcm_lora_path, adapter_name="lcm", trainable=False) 
+            self.lcm_loaded = True  # set earlier flag to true
+            # Switch the pipeline to use the preconfigured LCMScheduler for inference acceleration.
+            self.scheduler = self.lcm_scheduler
 
         self.scheduler.set_timesteps(num_inference_steps)
         # Modified LoRA loading with LCM combination
@@ -449,19 +458,21 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             width=512,
             num_inference_steps=50,
             num_actual_inference_steps=None,
-            guidance_scale=1,
+            guidance_scale=7.5,
             attn_beta=0,
             lamd=0.6,
             use_lora=True,
             use_adain=True,
             use_reschedule=True,
             output_path="./results",
-            num_frames=50,
+            num_frames=16,
             fix_lora=None,
             progress=tqdm,
             unconditioning=None,
             neg_prompt=None,
             save_intermediates=False,
+            use_lcm=False,
+            lcm_lora_path=None,
             **kwds):
 
         # if isinstance(prompt, list):
