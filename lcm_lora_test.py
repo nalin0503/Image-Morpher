@@ -19,16 +19,17 @@ pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
 # Ensure the pipeline is on CUDA with the proper dtype
 # pipe.to(device="cuda", dtype=torch.float16) # Removed device argument
 
-prompt = "A hyperrealistic portrait of a cute fox, highly detailed, 8k resolution"
-negative_prompt = "blurry, low quality, cartoon, anime, sketches"
+prompt = "A hyperrealistic portrait of a fox, highly detailed, cute pet"
+# negative_prompt = "blurry, low quality"
 generator = torch.manual_seed(0)  # for reproducibility
 
 # Run inference (using very few steps as typical for LCM accelerated inference)
-image = pipe(prompt, negative_prompt=negative_prompt,
-             num_inference_steps=4, guidance_scale=1, generator=generator).images[0]
+image = pipe(prompt, 
+            #  negative_prompt=negative_prompt,
+             num_inference_steps=8, guidance_scale=7.5, generator=generator).images[0]
 
 # Save the resulting image to disk
-image.save("lcm_accelerated_fox.png")
+image.save("lcm_accelerated_fox2.png")
 
 
 
