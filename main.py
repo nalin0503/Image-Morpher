@@ -78,7 +78,7 @@ parser.add_argument(
     help="Enable LCM-LoRA acceleration (default: %(default)s)" # to activate
 )
 parser.add_argument(
-    "--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdxl",
+    "--lcm_lora_path", type=str, default="latent-consistency/lcm-lora-sdv1-5",
     help="Path to LCM-LoRA weights (default: %(default)s)"
 )
 parser.add_argument(
