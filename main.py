@@ -8,12 +8,12 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="Lykon/dreamshaper-7",
+    "--model_path", type=str, default="sd-legacy/stable-diffusion-v1-5",
     help="Pretrained model to use (default: %(default)s)"
 )
 # Available SDV1-5 versions: 
 # sd-legacy/stable-diffusion-v1-5
-# Lykon/dreamshaper-7
+# lykon/dreamshaper-7
 # "runwayml/stable-diffusion-v1-5"
 
 # Original DiffMorpher SD: 
