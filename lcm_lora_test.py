@@ -16,24 +16,24 @@ pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
 
 # Load LCM LoRA for SD v1.5
 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
-pipe.fuse_lora()
+# pipe.fuse_lora() #  Stable Diffusion Pipeline above does not have this...
 
 # Ensure the pipeline is on CUDA with the proper dtype
 # pipe.to(device="cuda", dtype=torch.float16) # Removed device argument
 
 prompt = "A hyperrealistic portrait of a cat, highly detailed, cute pet"
 negative_prompt = "blurry, low quality"
-generator = torch.manual_seed(42)  # for reproducibility
+generator = torch.manual_seed(0)  # for reproducibility
 
 # Run inference (using very few steps as typical for LCM accelerated inference)
 image = pipe(prompt, 
-             negative_prompt=negative_prompt,
-             num_inference_steps=8, 
-             guidance_scale=0,
+             negative_prompt=negative_prompt, # this works well for dreamshaper ! best output is with this, num_inference = 8, and guidance =0 on dreamshaper
+             num_inference_steps=8, # 8 seems to work best for both... but finetune it. 
+             guidance_scale=0, # the dreamshaper model works better with guidance_scale = 0!! disabled essentially. 
              generator=generator).images[0]
 
 # Save the resulting image to disk
-image.save("lcm_accelerated_cat.png")
+image.save("lcm_accelerated_cat3.png")
 
 
 

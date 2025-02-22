@@ -8,9 +8,13 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="sd-legacy/stable-diffusion-v1-5", # TODO change to SDXL
+    "--model_path", type=str, default="Lykon/dreamshaper-7",
     help="Pretrained model to use (default: %(default)s)"
 )
+# Available SDV1-5 versions: 
+# sd-legacy/stable-diffusion-v1-5
+# Lykon/dreamshaper-7
+# "runwayml/stable-diffusion-v1-5"
 parser.add_argument(
     "--image_path_0", type=str, default="",
     help="Path of the first image (default: %(default)s)")
