@@ -5,7 +5,8 @@ from diffusers import DiffusionPipeline
 
 # Load the SD v1.5 base model
 pipe = DiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
+    # "runwayml/stable-diffusion-v1-5",
+    "Lykon/dreamshaper-7", # seems to produce better results, its a fine-tuned sd1-5
     torch_dtype=torch.float16,
     # variant="fp16", # Removing variant since torch_dtype is set
 ).to("cuda")
@@ -15,21 +16,24 @@ pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
 
 # Load LCM LoRA for SD v1.5
 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+pipe.fuse_lora()
 
 # Ensure the pipeline is on CUDA with the proper dtype
 # pipe.to(device="cuda", dtype=torch.float16) # Removed device argument
 
-prompt = "A hyperrealistic portrait of a fox, highly detailed, cute pet"
-# negative_prompt = "blurry, low quality"
-generator = torch.manual_seed(0)  # for reproducibility
+prompt = "A hyperrealistic portrait of a cat, highly detailed, cute pet"
+negative_prompt = "blurry, low quality"
+generator = torch.manual_seed(42)  # for reproducibility
 
 # Run inference (using very few steps as typical for LCM accelerated inference)
 image = pipe(prompt, 
-            #  negative_prompt=negative_prompt,
-             num_inference_steps=8, guidance_scale=7.5, generator=generator).images[0]
+             negative_prompt=negative_prompt,
+             num_inference_steps=8, 
+             guidance_scale=0,
+             generator=generator).images[0]
 
 # Save the resulting image to disk
-image.save("lcm_accelerated_fox2.png")
+image.save("lcm_accelerated_cat.png")
 
 
 
