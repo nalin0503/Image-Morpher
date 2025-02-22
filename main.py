@@ -15,6 +15,9 @@ parser.add_argument(
 # sd-legacy/stable-diffusion-v1-5
 # Lykon/dreamshaper-7
 # "runwayml/stable-diffusion-v1-5"
+
+# Original DiffMorpher SD: 
+# stabilityai/stable-diffusion-2-1-base
 parser.add_argument(
     "--image_path_0", type=str, default="",
     help="Path of the first image (default: %(default)s)")
