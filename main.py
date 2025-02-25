@@ -8,7 +8,7 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="lykon/dreamshaper-7", # TODO add this as option on the UI, for 2-1 and 1-5.
+    "--model_path", type=str, default="sd-legacy/stable-diffusion-v1-5", # TODO add this as option on the UI, for 2-1 and 1-5 and dreamshaper too (if works).
     help="Pretrained model to use (default: %(default)s)"
 )
 
