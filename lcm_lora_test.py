@@ -18,7 +18,7 @@ pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
 
 # Load LCM LoRA for SD v1.5
 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
-pipe.fuse_lora() #  Stable Diffusion Pipeline above does not have this... diffusers 0.23 does!
+# pipe.fuse_lora() #  Stable Diffusion Pipeline above does not have this... diffusers 0.23 does!
 
 # Ensure the pipeline is on CUDA with the proper dtype
 # pipe.to(device="cuda", dtype=torch.float16) # Removed device argument
