@@ -8,9 +8,16 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="stabilityai/stable-diffusion-2-1-base",
+    "--model_path", type=str, default="lykon/dreamshaper-7",
     help="Pretrained model to use (default: %(default)s)"
 )
+# Available SDV1-5 versions (all have lcm-lora support): 
+# sd-legacy/stable-diffusion-v1-5
+# lykon/dreamshaper-7
+# "runwayml/stable-diffusion-v1-5"
+
+# Original DiffMorpher SD (no lcm-lora support): 
+# stabilityai/stable-diffusion-2-1-base
 parser.add_argument(
     "--image_path_0", type=str, default="",
     help="Path of the first image (default: %(default)s)"
@@ -71,7 +78,8 @@ if args.use_lcm:
     pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
     # Optionally, if you want to enforce a lower number of inference steps:
     lcm_inference_steps = 8  # recommended as per technical report
-    pipeline.scheduler.set_timesteps(lcm_inference_steps)
+    pipeline.scheduler.set_timesteps(lcm_inference_steps)   
+
 
 # Run the pipeline inference using your existing parameters
 images = pipeline(
