@@ -133,7 +133,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         timestep = min(timestep - self.scheduler.config.num_train_timesteps //
                        self.scheduler.num_inference_steps, 999)
         alpha_prod_t = self.scheduler.alphas_cumprod[
-            timestep] if timestep >= 0 else self.scheduler.alphas_cumprod[-1]
+            timestep] if timestep >= 0 else self.scheduler.final_alpha_cumprod
         alpha_prod_t_next = self.scheduler.alphas_cumprod[next_step]
         beta_prod_t = 1 - alpha_prod_t
         pred_x0 = (x - beta_prod_t**0.5 * model_output) / alpha_prod_t**0.5
@@ -230,7 +230,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                 alpha_prod_t = self.scheduler.alphas_cumprod[t]
                 alpha_prod_t_prev = (
                     self.scheduler.alphas_cumprod[timesteps[i - 1]]
-                    if i > 0 else self.scheduler.alphas_cumprod[-1]
+                    if i > 0 else self.scheduler.final_alpha_cumprod
                 )
 
                 mu = alpha_prod_t ** 0.5
@@ -261,7 +261,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             self.scheduler.config.num_train_timesteps // self.scheduler.num_inference_steps
         alpha_prod_t = self.scheduler.alphas_cumprod[timestep]
         alpha_prod_t_prev = self.scheduler.alphas_cumprod[
-            prev_timestep] if prev_timestep > 0 else self.scheduler.alphas_cumprod[-1]
+            prev_timestep] if prev_timestep > 0 else self.scheduler.final_alpha_cumprod
         beta_prod_t = 1 - alpha_prod_t
         pred_x0 = (x - beta_prod_t**0.5 * model_output) / alpha_prod_t**0.5
         pred_dir = (1 - alpha_prod_t_prev)**0.5 * model_output
