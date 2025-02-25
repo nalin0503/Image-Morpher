@@ -8,16 +8,16 @@ from model import DiffMorpherPipeline
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="sd-legacy/stable-diffusion-v1-5", # TODO add this as option on the UI, for 2-1 and 1-5 and dreamshaper too (if works).
+    "--model_path", type=str, default="stabilityai/stable-diffusion-2-1-base", # TODO add this as option on the UI, for 2-1 and 1-5 and dreamshaper too (if works).
     help="Pretrained model to use (default: %(default)s)"
 )
 
-# Available SDV1-5 versions: 
+# Available SDV1-5 versions (all have lcm-lora support): 
 # sd-legacy/stable-diffusion-v1-5
 # lykon/dreamshaper-7
 # "runwayml/stable-diffusion-v1-5"
 
-# Original DiffMorpher SD: 
+# Original DiffMorpher SD (no lcm-lora support): 
 # stabilityai/stable-diffusion-2-1-base
 parser.add_argument(
     "--image_path_0", type=str, default="",
