@@ -105,6 +105,8 @@ images = pipeline(
     use_lora=not args.no_lora
 )
 
+# print(pipeline.scheduler)
+
 # Save the resulting GIF output from the sequence of images
 images[0].save(f"{args.output_path}/output.gif", save_all=True,
                append_images=images[1:], duration=args.duration, loop=0)

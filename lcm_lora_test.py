@@ -35,6 +35,7 @@ image = pipe(prompt,
 # Save the resulting image to disk
 image.save("lcm_accelerated_cat3.png")
 
+# print(pipe.scheduler)
 
 
 
