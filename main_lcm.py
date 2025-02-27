@@ -18,6 +18,7 @@ parser.add_argument(
 
 # Original DiffMorpher SD (no lcm-lora support): 
 # stabilityai/stable-diffusion-2-1-base
+
 parser.add_argument(
     "--image_path_0", type=str, default="",
     help="Path of the first image (default: %(default)s)"
@@ -60,28 +61,27 @@ parser.add_argument("--duration", type=int, default=100, help="Duration of each 
 parser.add_argument("--no_lora", action="store_true", help="Disable style LoRA (default: %(default)s)")
 
 # New argument for LCMS LoRA acceleration
-parser.add_argument("--use_lcm", action="store_true", help="Enable LCMS-LORA acceleration for faster sampling")
+parser.add_argument("--use_lcm", action="store_true", help="Enable LCM-LoRA acceleration for faster sampling")
 
 args = parser.parse_args()
 os.makedirs(args.output_path, exist_ok=True)
 
 # Create the pipeline from the given model path
 pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
-pipeline.to("cuda")
+pipeline.to("cuda") 
 
-# Integrate LCMS-LORA if flagged
+# Integrate LCMS-LORA if flagged, OUTSIDE any of the style LoRA loading / training steps.
 if args.use_lcm:
     from lcm_schedule import LCMScheduler
     # Replace scheduler using LCMS's configuration
     pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
     # Load the LCMS LoRA weights (LCMS provides an add-on network; use your local path or default)
-    pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
-    # Optionally, if you want to enforce a lower number of inference steps:
-    lcm_inference_steps = 8  # recommended as per technical report
-    pipeline.scheduler.set_timesteps(lcm_inference_steps)   
+    pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5") ## This is working correctly! 
+    # Set the lcm_inference_steps
+    args.num_inference_steps = 8  # Override with LCM-recommended steps
 
-
-# Run the pipeline inference using your existing parameters
+# Run the pipeline inference using existing parameters
+# Note to self: pipeline is a callable class.
 images = pipeline(
     img_path_0=args.image_path_0,
     img_path_1=args.image_path_1,
@@ -95,6 +95,7 @@ images = pipeline(
     lamd=args.lamb,
     output_path=args.output_path,
     num_frames=args.num_frames,
+    num_inference_steps = args.num_inference_steps, # enforce when LCM enabled
     fix_lora=args.fix_lora_value,
     save_intermediates=args.save_inter,
     use_lora=not args.no_lora

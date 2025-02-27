@@ -1,3 +1,4 @@
+# model.py
 import os
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.attention_processor import AttnProcessor
