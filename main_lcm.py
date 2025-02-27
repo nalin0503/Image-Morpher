@@ -51,6 +51,10 @@ parser.add_argument(
     "--load_lora_path_1", type=str, default="",
     help="Path of the LoRA weights for the second image (default: %(default)s)"
 )
+parser.add_argument(
+    "--num_inference_steps", type=int, default=50, 
+    help="Number of inference steps (default: %(default)s)")
+
 parser.add_argument("--use_adain", action="store_true", help="Use AdaIN (default: %(default)s)")
 parser.add_argument("--use_reschedule",  action="store_true", help="Use reschedule sampling (default: %(default)s)")
 parser.add_argument("--lamb",  type=float, default=0.6, help="Lambda for self-attention replacement (default: %(default)s)")
@@ -60,7 +64,7 @@ parser.add_argument("--num_frames", type=int, default=16, help="Number of frames
 parser.add_argument("--duration", type=int, default=100, help="Duration of each frame (default: %(default)s ms)")
 parser.add_argument("--no_lora", action="store_true", help="Disable style LoRA (default: %(default)s)")
 
-# New argument for LCMS LoRA acceleration
+# New argument for LCM LoRA acceleration
 parser.add_argument("--use_lcm", action="store_true", help="Enable LCM-LoRA acceleration for faster sampling")
 
 args = parser.parse_args()
@@ -70,12 +74,12 @@ os.makedirs(args.output_path, exist_ok=True)
 pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
 pipeline.to("cuda") 
 
-# Integrate LCMS-LORA if flagged, OUTSIDE any of the style LoRA loading / training steps.
+# Integrate LCM-LoRA if flagged, OUTSIDE any of the style LoRA loading / training steps.
 if args.use_lcm:
     from lcm_schedule import LCMScheduler
     # Replace scheduler using LCMS's configuration
     pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
-    # Load the LCMS LoRA weights (LCMS provides an add-on network; use your local path or default)
+    # Load the LCM LoRA weights (LCMS provides an add-on network; use your local path or default)
     pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5") ## This is working correctly! 
     # Set the lcm_inference_steps
     args.num_inference_steps = 8  # Override with LCM-recommended steps
