@@ -14,7 +14,7 @@
 
 srun -p rtx3090_slab -w slabgpu08 --gres=gpu:1 \
     --job-name=test --kill-on-bad-exit=1 python3 main_lcm.py \
-    --image_path_0 ./assets/trump.png --image_path_1 ./assets/biden.png \
+    --image_path_0 ./assets/Trump.jpg --image_path_1 ./assets/Biden.jpg \
     --prompt_0 "A photo of an American man" --prompt_1 "A photo of an American man" \
     --output_path "./results/Trump_Biden" --use_adain --use_reschedule \
     --save_inter --use_lcm
