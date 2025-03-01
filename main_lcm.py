@@ -14,7 +14,6 @@ parser.add_argument(
 # Available SDV1-5 versions (all have lcm-lora support): 
 # sd-legacy/stable-diffusion-v1-5
 # lykon/dreamshaper-7
-# "runwayml/stable-diffusion-v1-5"
 
 # Original DiffMorpher SD (no lcm-lora support): 
 # stabilityai/stable-diffusion-2-1-base
@@ -54,6 +53,10 @@ parser.add_argument(
 parser.add_argument(
     "--num_inference_steps", type=int, default=50, 
     help="Number of inference steps (default: %(default)s)")
+parser.add_argument(
+    "--guidance_scale", type=float, default=1,  # To match current diffmorpher
+    help="Guidance scale for classifier-free guidance (default: %(default)s)"
+)
 
 parser.add_argument("--use_adain", action="store_true", help="Use AdaIN (default: %(default)s)")
 parser.add_argument("--use_reschedule",  action="store_true", help="Use reschedule sampling (default: %(default)s)")
@@ -83,6 +86,8 @@ if args.use_lcm:
     pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5") ## This is working correctly! 
     # Set the lcm_inference_steps
     args.num_inference_steps = 8  # Override with LCM-recommended steps
+    # set CFG according to model selected TODO
+    args.guidance_scale = 1
 
 # Run the pipeline inference using existing parameters
 # Note to self: pipeline is a callable class.
@@ -102,7 +107,8 @@ images = pipeline(
     num_inference_steps = args.num_inference_steps, # enforce when LCM enabled
     fix_lora=args.fix_lora_value,
     save_intermediates=args.save_inter,
-    use_lora=not args.no_lora
+    use_lora=not args.no_lora,
+    guidance_scale=args.guidance_scale, # enforce when LCM enabled
 )
 
 # print(pipeline.scheduler)
