@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 from argparse import ArgumentParser
 from model import DiffMorpherPipeline
+from torch import autocast
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -74,7 +75,15 @@ args = parser.parse_args()
 os.makedirs(args.output_path, exist_ok=True)
 
 # Create the pipeline from the given model path
-pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
+# pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
+
+# new, float16 for optimized LCM operations...
+pipeline = DiffMorpherPipeline.from_pretrained(
+    args.model_path, 
+    torch_dtype=torch.float16 if args.use_lcm else torch.float32,
+    safety_checker=None,
+    requires_safety_checker=False
+)
 pipeline.to("cuda") 
 
 # Integrate LCM-LoRA if flagged, OUTSIDE any of the style LoRA loading / training steps.
@@ -87,29 +96,30 @@ if args.use_lcm:
     # Set the lcm_inference_steps
     args.num_inference_steps = 8  # Override with LCM-recommended steps
     # set CFG according to model selected TODO
-    args.guidance_scale = 1
+    args.guidance_scale = 2.5
 
 # Run the pipeline inference using existing parameters
 # Note to self: pipeline is a callable class.
-images = pipeline(
-    img_path_0=args.image_path_0,
-    img_path_1=args.image_path_1,
-    prompt_0=args.prompt_0,
-    prompt_1=args.prompt_1,
-    save_lora_dir=args.save_lora_dir,
-    load_lora_path_0=args.load_lora_path_0,
-    load_lora_path_1=args.load_lora_path_1,
-    use_adain=args.use_adain,
-    use_reschedule=args.use_reschedule,
-    lamd=args.lamb,
-    output_path=args.output_path,
-    num_frames=args.num_frames,
-    num_inference_steps = args.num_inference_steps, # enforce when LCM enabled
-    fix_lora=args.fix_lora_value,
-    save_intermediates=args.save_inter,
-    use_lora=not args.no_lora,
-    guidance_scale=args.guidance_scale, # enforce when LCM enabled
-)
+with autocast("cuda"): 
+    images = pipeline(
+        img_path_0=args.image_path_0,
+        img_path_1=args.image_path_1,
+        prompt_0=args.prompt_0,
+        prompt_1=args.prompt_1,
+        save_lora_dir=args.save_lora_dir,
+        load_lora_path_0=args.load_lora_path_0,
+        load_lora_path_1=args.load_lora_path_1,
+        use_adain=args.use_adain,
+        use_reschedule=args.use_reschedule,
+        lamd=args.lamb,
+        output_path=args.output_path,
+        num_frames=args.num_frames,
+        num_inference_steps = args.num_inference_steps, # enforce when LCM enabled
+        fix_lora=args.fix_lora_value,
+        save_intermediates=args.save_inter,
+        use_lora=not args.no_lora,
+        guidance_scale=args.guidance_scale, # enforce when LCM enabled
+    )
 
 # print(pipeline.scheduler)
 

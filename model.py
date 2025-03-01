@@ -53,35 +53,30 @@ class LoadProcessor():
         self.beta = beta
         self.lamd = lamd
         self.id = 0
+        self.cfg_mode = False  # Add this flag
 
     def __call__(self, attn, hidden_states, *args, encoder_hidden_states=None, attention_mask=None, **kwargs):
         # Is self attention
         if encoder_hidden_states is None:
-            if self.id < 50 * self.lamd:
+            # Handle CFG expansion
+            if hidden_states.shape[0] > len(self.img0_dict[self.name]): # Check if batch size is doubled
+                map0 = torch.cat([self.img0_dict[self.name][self.id]] * 2, dim=0)  # Duplicate for CFG
+                map1 = torch.cat([self.img1_dict[self.name][self.id]] * 2, dim=0)
+                self.cfg_mode = True #set flag to true
+            else:
                 map0 = self.img0_dict[self.name][self.id]
                 map1 = self.img1_dict[self.name][self.id]
-                cross_map = self.beta * hidden_states + \
-                    (1 - self.beta) * ((1 - self.alpha) * map0 + self.alpha * map1)
-                # cross_map = self.beta * hidden_states + \
-                #     (1 - self.beta) * slerp(map0, map1, self.alpha)
-                # cross_map = slerp(slerp(map0, map1, self.alpha),
-                #                   hidden_states, self.beta)
-                # cross_map = hidden_states
-                # cross_map = torch.cat(
-                #     ((1 - self.alpha) * map0, self.alpha * map1), dim=1)
+                self.cfg_mode = False #set flag to false
 
-                res = self.original_processor(attn, hidden_states, *args,
-                                              encoder_hidden_states=cross_map,
-                                              attention_mask=attention_mask,
-                                              **kwargs)
-            else:
-                res = self.original_processor(attn, hidden_states, *args,
-                                              encoder_hidden_states=encoder_hidden_states,
-                                              attention_mask=attention_mask,
-                                              **kwargs)
+            cross_map = self.beta * hidden_states + \
+                (1 - self.beta) * ((1 - self.alpha) * map0 + self.alpha * map1)
 
+            res = self.original_processor(attn, hidden_states, *args,
+                                          encoder_hidden_states=cross_map,
+                                          attention_mask=attention_mask,
+                                          **kwargs)
             self.id += 1
-            # if self.id == len(self.img0_dict[self.name]):
+
             if self.id == len(self.img0_dict[self.name]):
                 self.id = 0
         else:
@@ -404,7 +399,10 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             unconditioning=None,
             neg_prompt=None,
             save_intermediates=False,
-            **kwds):
+            **kwargs):
+        if kwargs.get('guidance_scale', 1) > 1:
+            self.unet.enable_forward_chunking()
+            self.unent.config.attention_head_dim = self.unet.config.attention_head_dim // 2
 
         # if isinstance(prompt, list):
         #     batch_size = len(prompt)
