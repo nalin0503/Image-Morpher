@@ -302,7 +302,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         return image  # range [-1, 1]
 
     @torch.no_grad()
-    def cal_latent(self, num_inference_steps, guidance_scale, unconditioning, img_noise_0, img_noise_1, text_embeddings_0, text_embeddings_1, lora_0, lora_1, alpha, use_lora, fix_lora=None):
+    def cal_latent(self, num_inference_steps, guidance_scale, unconditioning, img_noise_0, img_noise_1, text_embeddings_0, text_embeddings_1, lora_0, lora_1, alpha, use_lora, use_lcm, fix_lora=None):
         # latents = torch.cos(alpha * torch.pi / 2) * img_noise_0 + \
         #     torch.sin(alpha * torch.pi / 2) * img_noise_1
         # latents = (1 - alpha) * img_noise_0 + alpha * img_noise_1
@@ -318,7 +318,12 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             else:
                 self.unet = load_lora(self.unet, lora_0, lora_1, alpha)
 
-        for i, t in enumerate(tqdm.tqdm(self.scheduler.timesteps, desc=f"DDIM Sampler, alpha={alpha}")):
+        if use_lcm:
+            sampler_desc = "LCM multi-step sampler"
+        else: 
+            sampler_desc = "DDIM Sampler" # currently defaults to this   
+
+        for i, t in enumerate(tqdm.tqdm(self.scheduler.timesteps, desc=f"{sampler_desc}, alpha={alpha}")):
 
             if guidance_scale > 1.:
                 model_inputs = torch.cat([latents] * 2)
@@ -395,6 +400,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
             attn_beta=0,
             lamd=0.6,
             use_lora=True,
+            use_lcm = False,
             use_adain=True,
             use_reschedule=True,
             output_path="./results",
@@ -416,6 +422,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
         self.use_adain = use_adain
         self.use_reschedule = use_reschedule
         self.output_path = output_path
+        self.use_lcm = use_lcm
 
         if img_0 is None:
             img_0 = Image.open(img_path_0).convert("RGB")
