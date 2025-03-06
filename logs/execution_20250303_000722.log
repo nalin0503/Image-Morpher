@@ -1,0 +1,11 @@
+2025-03-03 00:08:10,065 - INFO - Total execution time: 47.30 seconds
+2025-03-03 00:08:10,065 - INFO - Model Path: sd-legacy/stable-diffusion-v1-5
+2025-03-03 00:08:10,065 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-03 00:08:10,065 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-03 00:08:10,065 - INFO - Use LCM: True
+2025-03-03 00:08:10,065 - INFO - Number of inference steps: 8
+2025-03-03 00:08:10,065 - INFO - Guidance scale: 1
+
+was with the other torch flags, but i think loras were loaded in alr
+
+

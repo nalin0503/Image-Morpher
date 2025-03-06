@@ -5,6 +5,24 @@ import numpy as np
 from PIL import Image
 from argparse import ArgumentParser
 from model import DiffMorpherPipeline
+import time
+import logging
+
+logs_folder = "logs"
+os.makedirs(logs_folder, exist_ok=True)
+
+# Create a unique log filename using the current time 
+log_filename = os.path.join(logs_folder, f"execution_{time.strftime('%Y%m%d_%H%M%S')}.log")
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+start_time = time.time()
+
+# torch.set_float32_matmul_precision("high")
+torch.backends.cudnn.benchmark = True # finds efficient convolution algo by running short benchmark first
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -116,3 +134,18 @@ images = pipeline(
 # Save the resulting GIF output from the sequence of images
 images[0].save(f"{args.output_path}/output.gif", save_all=True,
                append_images=images[1:], duration=args.duration, loop=0)
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+
+# Log the execution details and parameters
+logging.info(f"Total execution time: {elapsed_time:.2f} seconds")
+logging.info(f"Model Path: {args.model_path}")
+logging.info(f"Image Path 0: {args.image_path_0}")
+logging.info(f"Image Path 1: {args.image_path_1}")
+logging.info(f"Use LCM: {args.use_lcm}")
+logging.info(f"Number of inference steps: {args.num_inference_steps}")
+logging.info(f"Guidance scale: {args.guidance_scale}")
+
+
+print(f"Total execution time: {elapsed_time:.2f} seconds, log file saved as {log_filename}")

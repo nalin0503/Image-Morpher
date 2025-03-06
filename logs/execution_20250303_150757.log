@@ -1,0 +1,9 @@
+2025-03-03 15:10:09,361 - INFO - Total execution time: 131.64 seconds
+2025-03-03 15:10:09,362 - INFO - Model Path: sd-legacy/stable-diffusion-v1-5
+2025-03-03 15:10:09,362 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-03 15:10:09,362 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-03 15:10:09,362 - INFO - Use LCM: True
+2025-03-03 15:10:09,362 - INFO - Number of inference steps: 8
+2025-03-03 15:10:09,362 - INFO - Guidance scale: 1
+
+this was with the flags, no diff.

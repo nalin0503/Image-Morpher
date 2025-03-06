@@ -1,0 +1,9 @@
+2025-03-02 22:57:31,314 - INFO - Total execution time: 123.84 seconds
+2025-03-02 22:57:31,314 - INFO - Model Path: sd-legacy/stable-diffusion-v1-5
+2025-03-02 22:57:31,314 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-02 22:57:31,314 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-02 22:57:31,315 - INFO - Number of inference steps: 8
+2025-03-02 22:57:31,315 - INFO - Guidance scale: 1
+2025-03-02 22:57:31,315 - INFO - Use LCM: True
+
+cudnn benchmark
