@@ -126,6 +126,7 @@ images = pipeline(
     fix_lora=args.fix_lora_value,
     save_intermediates=args.save_inter,
     use_lora=not args.no_lora,
+    use_lcm = args.use_lcm,
     guidance_scale=args.guidance_scale, # enforce when LCM enabled
 )
 
