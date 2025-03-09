@@ -1,0 +1,16 @@
+2025-03-09 23:53:03,895 - INFO - Total execution time: 104.19 seconds
+2025-03-09 23:53:03,895 - INFO - Model Path: stabilityai/stable-diffusion-2-1-base
+2025-03-09 23:53:03,896 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 23:53:03,896 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 23:53:03,896 - INFO - Use LCM: True
+2025-03-09 23:53:03,896 - INFO - Number of inference steps: 8
+2025-03-09 23:53:03,896 - INFO - Guidance scale: 1
+
+
+this was base, with the 
+
+torch.backends.cudnn.benchmark = True
+torch.set_float32_matmul_precision("high")  # Better for modern GPUs
+
+commented OUT. Hence the previous does make a difference. 
+

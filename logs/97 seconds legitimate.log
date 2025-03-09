@@ -1,0 +1,23 @@
+2025-03-09 23:23:30,516 - INFO - Total execution time: 97.10 seconds
+2025-03-09 23:23:30,516 - INFO - Model Path: stabilityai/stable-diffusion-2-1-base
+2025-03-09 23:23:30,516 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 23:23:30,516 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 23:23:30,516 - INFO - Use LCM: True
+2025-03-09 23:23:30,516 - INFO - Number of inference steps: 8
+2025-03-09 23:23:30,516 - INFO - Guidance scale: 1
+
+
+so first time under 100 seconds.
+
+
+this was with
+# Configure compiler settings (safe defaults)
+inductor.config.force_fuse_int_mm_with_mul = True  # Better for diffusion models
+
+and adding 
+# Adding these AFTER device movement, instead of before, so it can optimise convolutions for the specific GPU / cuda kernel
+torch.backends.cudnn.benchmark = True
+torch.set_float32_matmul_precision("high")  # Better for modern GPUs
+
+
+In all i was able to shave off about 20-30 seconds from the optimisations, from the lcm-lora it was about a minute (?) so 1.5min saved

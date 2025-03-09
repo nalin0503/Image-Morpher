@@ -1,0 +1,17 @@
+2025-03-09 23:30:11,054 - INFO - Total execution time: 97.80 seconds
+2025-03-09 23:30:11,054 - INFO - Model Path: stabilityai/stable-diffusion-2-1-base
+2025-03-09 23:30:11,054 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 23:30:11,054 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 23:30:11,055 - INFO - Use LCM: True
+2025-03-09 23:30:11,055 - INFO - Number of inference steps: 8
+2025-03-09 23:30:11,055 - INFO - Guidance scale: 1
+
+
+so this was without the 
+
+# Configure compiler settings (safe defaults)
+# inductor.config.force_fuse_int_mm_with_mul = True  # Better for diffusion models
+
+it was 0.7 seconds off, so the real benefit (of the real cudnn benchmark OR the set_float32_matmul_precision actually!!, u didnt realise bef) was 
+shifting the cudnn benchmark test AFTER pipeline.to("cuda")
+

@@ -1,0 +1,10 @@
+2025-03-09 22:49:15,959 - ERROR - Model loading failed: [Errno 2] No such file or directory: '/mnt/slurm_home/nalin/.cache/huggingface/hub/models--DarkFlameUniverse--Stable-Diffusion-2-1-Base-8bit/refs/main', switching to standard 2-1 base.
+2025-03-09 22:49:50,993 - INFO - Total execution time: 35.29 seconds
+2025-03-09 22:49:50,993 - INFO - Model Path: DarkFlameUniverse/Stable-Diffusion-2-1-Base-8bit
+2025-03-09 22:49:50,993 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 22:49:50,993 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 22:49:50,993 - INFO - Use LCM: True
+2025-03-09 22:49:50,993 - INFO - Number of inference steps: 8
+2025-03-09 22:49:50,993 - INFO - Guidance scale: 1
+
+fail with v_prediction prediction_type

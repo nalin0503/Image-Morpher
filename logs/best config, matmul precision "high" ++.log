@@ -1,0 +1,17 @@
+2025-03-09 23:57:53,227 - INFO - Total execution time: 97.25 seconds
+2025-03-09 23:57:53,227 - INFO - Model Path: stabilityai/stable-diffusion-2-1-base
+2025-03-09 23:57:53,227 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 23:57:53,227 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 23:57:53,227 - INFO - Use LCM: True
+2025-03-09 23:57:53,228 - INFO - Number of inference steps: 8
+2025-03-09 23:57:53,228 - INFO - Guidance scale: 1
+
+
+
+best result, this was with 
+torch.set_float32_matmul_precision("high")  # Better for modern GPUs
+
+it instructs cuda to not be so precise in intermediate computations, does some approximations, rounding that would not be crucial in a 
+deep learning workload..... on "medium" or "low" settings they have additional steps to ensure this precision apparently. 
+
+and this was particularly useful after moving pipeline.to("cuda"). 

@@ -1,0 +1,15 @@
+2025-03-09 23:55:24,160 - INFO - Total execution time: 104.42 seconds
+2025-03-09 23:55:24,160 - INFO - Model Path: stabilityai/stable-diffusion-2-1-base
+2025-03-09 23:55:24,160 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 23:55:24,160 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 23:55:24,160 - INFO - Use LCM: True
+2025-03-09 23:55:24,160 - INFO - Number of inference steps: 8
+2025-03-09 23:55:24,160 - INFO - Guidance scale: 1
+
+
+this was with 
+
+torch.backends.cudnn.benchmark = True
+
+not much speed up! infact its a bit slower (sometimes its slightly tiny bit faster)
+

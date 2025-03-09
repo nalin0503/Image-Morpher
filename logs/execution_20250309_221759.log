@@ -1,0 +1,26 @@
+2025-03-09 22:17:59,860 - ERROR - Model loading failed: [Errno 2] No such file or directory: '/mnt/slurm_home/nalin/.cache/huggingface/hub/models--DarkFlameUniverse--Stable-Diffusion-2-1-Base-8bit/refs/main', switching to standard 2-1 base.
+
+torch.compile() doesnt really work, the lora training is very slow.
+
+change: 
+
+def compile_components(pipe):
+    # Compile with maximum optimization
+    pipe.unet = torch.compile(
+        pipe.unet,
+        mode="max-autotune",
+        fullgraph=True,
+        dynamic=False
+    )
+    
+    # Special compilation for VAE decoder
+    pipe.vae.decode = torch.compile(
+        pipe.vae.decode,
+        mode="reduce-overhead",
+        fullgraph=True
+    )
+    
+    return pipe
+
+if not args.use_lcm:  # LCM may conflict with full compilation
+    pipeline = compile_components(pipeline)
