@@ -28,15 +28,19 @@ torch.backends.cudnn.benchmark = True # finds efficient convolution algo by runn
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--model_path", type=str, default="sd-legacy/stable-diffusion-v1-5",
+    "--model_path", type=str, default="stabilityai/stable-diffusion-2-1-base",
     help="Pretrained model to use (default: %(default)s)"
 )
-# Available SDV1-5 versions (all have lcm-lora support): 
+# Available SDV1-5 versions: 
 # sd-legacy/stable-diffusion-v1-5
 # lykon/dreamshaper-7
 
-# Original DiffMorpher SD (no lcm-lora support): 
+# Original DiffMorpher SD: 
 # stabilityai/stable-diffusion-2-1-base
+
+# Quantized models to try
+# DarkFlameUniverse/Stable-Diffusion-2-1-Base-8bit
+# Xerox32/SD2.1-base-Int8
 
 parser.add_argument(
     "--image_path_0", type=str, default="",
@@ -95,7 +99,10 @@ os.makedirs(args.output_path, exist_ok=True)
 
 # Create the pipeline from the given model path
 pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
-pipeline.to("cuda") 
+
+pipeline.enable_vae_slicing()
+pipeline.enable_attention_slicing()
+pipeline.to("cuda")
 
 # Integrate LCM-LoRA if flagged, OUTSIDE any of the style LoRA loading / training steps.
 if args.use_lcm:
