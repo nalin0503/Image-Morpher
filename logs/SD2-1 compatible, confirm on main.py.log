@@ -1,0 +1,10 @@
+2025-03-09 18:44:19,754 - INFO - Total execution time: 104.91 seconds
+2025-03-09 18:44:19,754 - INFO - Model Path: stabilityai/stable-diffusion-2-1-base
+2025-03-09 18:44:19,754 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 18:44:19,755 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 18:44:19,755 - INFO - Use LCM: True
+2025-03-09 18:44:19,755 - INFO - Number of inference steps: 8
+2025-03-09 18:44:19,755 - INFO - Guidance scale: 1
+
+
+confirm that sd2-1 is faster than sdv1-5 in training, saved about 15-20s here. 

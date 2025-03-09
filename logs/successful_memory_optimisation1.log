@@ -1,0 +1,17 @@
+2025-03-09 17:01:38,747 - INFO - Total execution time: 121.97 seconds
+2025-03-09 17:01:38,747 - INFO - Model Path: sd-legacy/stable-diffusion-v1-5
+2025-03-09 17:01:38,747 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 17:01:38,747 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 17:01:38,747 - INFO - Use LCM: True
+2025-03-09 17:01:38,747 - INFO - Number of inference steps: 8
+2025-03-09 17:01:38,747 - INFO - Guidance scale: 1
+
+
+fastest one yet, 
+with optimisation
+pipeline.enable_vae_slicing()
+pipeline.enable_attention_slicing()
+
+about 5-8 seconds saved on average.
+
+and the cudnn benchmark MAYBE helps but not really.

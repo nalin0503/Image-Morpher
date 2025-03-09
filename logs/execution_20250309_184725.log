@@ -1,0 +1,10 @@
+2025-03-09 18:49:26,905 - INFO - Total execution time: 121.72 seconds
+2025-03-09 18:49:26,906 - INFO - Model Path: sd-legacy/stable-diffusion-v1-5
+2025-03-09 18:49:26,906 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 18:49:26,906 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 18:49:26,906 - INFO - Use LCM: True
+2025-03-09 18:49:26,906 - INFO - Number of inference steps: 8
+2025-03-09 18:49:26,906 - INFO - Guidance scale: 1
+
+
+yup sdv1-5 slower and worse results (biden dun have teeth)

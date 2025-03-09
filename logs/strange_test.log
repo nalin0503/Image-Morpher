@@ -1,0 +1,12 @@
+2025-03-09 17:45:32,554 - ERROR - Model loading failed: [Errno 2] No such file or directory: '/mnt/slurm_home/nalin/.cache/huggingface/hub/models--DarkFlameUniverse--Stable-Diffusion-2-1-Base-8bit/refs/main'
+2025-03-09 17:47:22,395 - INFO - Total execution time: 110.10 seconds
+2025-03-09 17:47:22,396 - INFO - Model Path: DarkFlameUniverse/Stable-Diffusion-2-1-Base-8bit # i think this was NOT the model path that was actually used.
+2025-03-09 17:47:22,396 - INFO - Image Path 0: ./assets/Trump.jpg
+2025-03-09 17:47:22,396 - INFO - Image Path 1: ./assets/Biden.jpg
+2025-03-09 17:47:22,396 - INFO - Use LCM: True
+2025-03-09 17:47:22,396 - INFO - Number of inference steps: 8
+2025-03-09 17:47:22,396 - INFO - Guidance scale: 1
+
+
+so it worked with the quantized 8-bit model (no it didnt) ! but... it was not able to load it in at first, then had to use my local cache of the failed run i tried befo i think (nope)
+

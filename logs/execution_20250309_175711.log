@@ -1,0 +1,1 @@
+2025-03-09 17:57:11,357 - ERROR - Model loading failed: [Errno 2] No such file or directory: '/mnt/slurm_home/nalin/.cache/huggingface/hub/models--DarkFlameUniverse--Stable-Diffusion-2-1-Base-8bit/refs/main', switching to standard 2-1 base.
