@@ -1,5 +1,5 @@
 """
-Modified main.py on DiffMorpher, LCM-LoRA support + param additions + logging 
+Modified main.py on DiffMorpher, LCM-LoRA support + param additions + logging + optimizations for speed-up
 """
 import os
 import torch
@@ -23,9 +23,6 @@ logging.basicConfig(
 
 start_time = time.time()
 
-# torch.set_float32_matmul_precision("high")
-torch.backends.cudnn.benchmark = True # finds efficient convolution algo by running short benchmark first
-
 parser = ArgumentParser()
 parser.add_argument(
     "--model_path", type=str, default="stabilityai/stable-diffusion-2-1-base",
@@ -38,7 +35,7 @@ parser.add_argument(
 # Original DiffMorpher SD: 
 # stabilityai/stable-diffusion-2-1-base
 
-# Quantized models to try
+# Quantized models to try (non-functional, possible extension for future)
 # DarkFlameUniverse/Stable-Diffusion-2-1-Base-8bit
 # Xerox32/SD2.1-base-Int8
 
@@ -100,9 +97,17 @@ os.makedirs(args.output_path, exist_ok=True)
 # Create the pipeline from the given model path
 pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
 
+# memory optimisations for vae and attention slicing - breaks computations into smaller chunks to fit better in mem
+# can lead to more efficient caching and memory access. better memory locality
+# found that its helpful with GPUs with limited VRAM memory in particular.
 pipeline.enable_vae_slicing()
 pipeline.enable_attention_slicing()
+
 pipeline.to("cuda")
+
+# Add these AFTER device movement
+torch.backends.cudnn.benchmark = True # finds efficient convolution algo by running short benchmark, minimal speed-up.
+torch.set_float32_matmul_precision("high")  # Better for modern GPUs, reduces about 7 seconds of inference time.
 
 # Integrate LCM-LoRA if flagged, OUTSIDE any of the style LoRA loading / training steps.
 if args.use_lcm:
