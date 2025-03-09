@@ -112,17 +112,16 @@ torch.set_float32_matmul_precision("high")  # Better for modern GPUs, reduces ab
 # Integrate LCM-LoRA if flagged, OUTSIDE any of the style LoRA loading / training steps.
 if args.use_lcm:
     from lcm_lora.lcm_schedule import LCMScheduler
-    # Replace scheduler using LCMS's configuration
+    # Replace scheduler using LCM's configuration
     pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
-    # Load the LCM LoRA weights (LCMS provides an add-on network; use your local path or default)
-    pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5") ## This is working correctly! 
+    # Load the LCM LoRA weights (LCM provides an add-on network)
+    pipeline.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
     # Set the lcm_inference_steps
     args.num_inference_steps = 8  # Override with LCM-recommended steps
-    # set CFG according to model selected TODO
+    # set CFG (range allowed by legacy code: 0 to 1, 1 performs best)
     args.guidance_scale = 1
 
 # Run the pipeline inference using existing parameters
-# Note to self: pipeline is a callable class.
 images = pipeline(
     img_path_0=args.image_path_0,
     img_path_1=args.image_path_1,
@@ -144,8 +143,6 @@ images = pipeline(
     guidance_scale=args.guidance_scale, # enforce when LCM enabled
 )
 
-# print(pipeline.scheduler)
-
 # Save the resulting GIF output from the sequence of images
 images[0].save(f"{args.output_path}/output.gif", save_all=True,
                append_images=images[1:], duration=args.duration, loop=0)
@@ -161,6 +158,5 @@ logging.info(f"Image Path 1: {args.image_path_1}")
 logging.info(f"Use LCM: {args.use_lcm}")
 logging.info(f"Number of inference steps: {args.num_inference_steps}")
 logging.info(f"Guidance scale: {args.guidance_scale}")
-
 
 print(f"Total execution time: {elapsed_time:.2f} seconds, log file saved as {log_filename}")
