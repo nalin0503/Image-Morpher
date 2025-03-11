@@ -9,6 +9,13 @@ from argparse import ArgumentParser
 from model import DiffMorpherPipeline
 import time
 import logging
+import gc
+
+# os.environ["HF_HOME"] = "/app/hf_cache"
+# os.environ["DIFFUSERS_CACHE"] = "/app/hf_cache"
+# os.environ["TORCH_HOME"] = "/app/torch_cache"
+# os.environ["TRANSFORMERS_CACHE"] = "/app/hf_cache"
+# os.environ["HF_DATASETS_CACHE"] = "/app/hf_cache/datasets"
 
 logs_folder = "logs"
 os.makedirs(logs_folder, exist_ok=True)
@@ -94,6 +101,13 @@ parser.add_argument("--use_lcm", action="store_true", help="Enable LCM-LoRA acce
 args = parser.parse_args()
 os.makedirs(args.output_path, exist_ok=True)
 
+# Clear any existing PyTorch GPU allocations
+torch.cuda.empty_cache()
+gc.collect()
+
+# Set environment variable for memory allocation
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 # Create the pipeline from the given model path
 pipeline = DiffMorpherPipeline.from_pretrained(args.model_path, torch_dtype=torch.float32)
 
@@ -146,6 +160,11 @@ images = pipeline(
 # Save the resulting GIF output from the sequence of images
 images[0].save(f"{args.output_path}/output.gif", save_all=True,
                append_images=images[1:], duration=args.duration, loop=0)
+
+# Ensure memory is freed after completion
+pipeline = None
+torch.cuda.empty_cache()
+gc.collect()
 
 end_time = time.time()
 elapsed_time = end_time - start_time
