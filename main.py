@@ -102,8 +102,8 @@ args = parser.parse_args()
 os.makedirs(args.output_path, exist_ok=True)
 
 # Clear any existing PyTorch GPU allocations
-torch.cuda.empty_cache()
-gc.collect()
+# torch.cuda.empty_cache()
+# gc.collect()
 
 # Set environment variable for memory allocation
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
