@@ -516,6 +516,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                     lora_1,
                     alpha_list[0],
                     False,
+                    self.use_lcm,
                     fix_lora
                 )
                 first_image = self.latent2image(latents)
@@ -552,6 +553,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                     lora_1,
                     alpha_list[-1],
                     False,
+                    self.use_lcm,
                     fix_lora
                 )
                 last_image = self.latent2image(latents)
@@ -592,6 +594,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         lora_1,
                         alpha_list[i],
                         False,
+                        self.use_lcm,
                         fix_lora
                     )
                     image = self.latent2image(latents)
@@ -617,6 +620,7 @@ class DiffMorpherPipeline(StableDiffusionPipeline):
                         lora_1,
                         alpha_list[k],
                         self.use_lora,
+                        self.use_lcm,
                         fix_lora
                     )
                     image = self.latent2image(latents)
