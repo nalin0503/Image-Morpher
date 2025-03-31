@@ -22,7 +22,7 @@ logs_folder = "keyframe_gen_logs"
 os.makedirs(logs_folder, exist_ok=True)
 
 # Create a unique log filename using the current time
-log_filename = os.path.join(logs_folder, f"execution_{time.strftime('%Y%m%d_%H%M%S')}.log")
+log_filename = os.path.join(logs_folder, f"keyframegen_{time.strftime('%Y%m%d_%H%M%S')}.log")
 logging.basicConfig(
     filename=log_filename,
     level=logging.INFO,
