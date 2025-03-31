@@ -1,6 +1,11 @@
 # DiffMorpher + LCM-LoRA: Optimized Keyframe Generator
 
-This repository contains an optimized version of [DiffMorpher](https://github.com/Kevin-thu/DiffMorpher) with LCM-LoRA acceleration for efficient keyframe generation in image morphing pipelines.
+## Acknowledgements
+
+- [DiffMorpher](https://github.com/Kevin-thu/DiffMorpher) for the base implementation
+- [Latent Consistency Models](https://github.com/luosiallen/latent-consistency-model) for the acceleration technique
+
+This repository contains an optimized workflow that builds upon the stellar work in [DiffMorpher](https://github.com/Kevin-thu/DiffMorpher).
 
 ## Overview
 
@@ -53,8 +58,3 @@ The implementation uses LCM-LoRA as a "universal acceleration module" while pres
 1. Replaces DDIM scheduler with LCMScheduler
 2. Loads LCM-LoRA weights on top of any style LoRA weights
 3. Reduces inference steps while maintaining semantic consistency
-
-## Acknowledgements
-
-- [DiffMorpher](https://github.com/Kevin-thu/DiffMorpher) for the base implementation
-- [Latent Consistency Models](https://github.com/luosiallen/latent-consistency-model) for the acceleration technique
